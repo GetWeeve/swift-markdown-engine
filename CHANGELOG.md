@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Custom heading typeface and color: `HeadingStyle.fontName` renders headings
+  in a specific PostScript face (honored exactly, so the chosen weight is
+  respected; an unresolvable name falls back to the stock bold base font),
+  and `MarkdownEditorTheme.headingText` colors heading text independently of
+  `bodyText` — the `#` glyphs stay on `headingMarker`, and inline constructs
+  inside a heading keep their own ink (both opt-in; the defaults are
+  unchanged).
+
 ## [0.11.0] - 2026-07-31
 
 ### Added

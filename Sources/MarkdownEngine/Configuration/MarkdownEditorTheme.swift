@@ -36,6 +36,15 @@ public struct MarkdownEditorTheme: Sendable {
     /// Foreground color for content the engine wants to deemphasize further
     /// than `mutedText` — for example, broken wiki-links.
     public var disabledText: NSColor
+    /// Foreground color for heading text. `nil` (the default) keeps the
+    /// historical behavior: headings render in ``bodyText`` like the rest
+    /// of the document.
+    ///
+    /// Only the heading's own text takes this color. The `#` marker glyphs
+    /// stay on ``headingMarker``, and inline constructs inside a heading
+    /// (links, inline code, extension spans) keep their own colors, exactly
+    /// as they do over ``bodyText``.
+    public var headingText: NSColor?
     /// Foreground color for heading marker glyphs (`#`, `##`, …).
     public var headingMarker: NSColor
 
@@ -85,6 +94,7 @@ public struct MarkdownEditorTheme: Sendable {
         bodyText: NSColor = .labelColor,
         mutedText: NSColor = .secondaryLabelColor,
         disabledText: NSColor = .tertiaryLabelColor,
+        headingText: NSColor? = nil,
         headingMarker: NSColor = .gray,
         link: NSColor = .linkColor,
         incompleteLink: NSColor = .systemBlue,
@@ -98,6 +108,7 @@ public struct MarkdownEditorTheme: Sendable {
         self.bodyText = bodyText
         self.mutedText = mutedText
         self.disabledText = disabledText
+        self.headingText = headingText
         self.headingMarker = headingMarker
         self.link = link
         self.incompleteLink = incompleteLink

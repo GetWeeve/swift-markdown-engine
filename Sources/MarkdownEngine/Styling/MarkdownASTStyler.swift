@@ -548,9 +548,15 @@ enum MarkdownASTStyler {
 
         case .heading(let level, let range, let markers, let inlines):
             let multiplier = ctx.config.headings.fontMultiplier(for: level)
-            let headingBase = NSFont(name: ctx.fontName, size: ctx.baseFont.pointSize * multiplier)
-                ?? .systemFont(ofSize: ctx.baseFont.pointSize * multiplier)
-            let headingFont = adding(.bold, to: headingBase)
+            let headingSize = ctx.baseFont.pointSize * multiplier
+            // A configured heading face is honored exactly — its weight is the
+            // embedder's choice, so no synthetic bold on top. A name that
+            // doesn't resolve degrades to the stock heading font (base family,
+            // bold trait), mirroring TaskCheckboxStyle's symbol fallback.
+            let headingFont = ctx.config.headings.fontName
+                .flatMap { NSFont(name: $0, size: headingSize) }
+                ?? adding(.bold, to: NSFont(name: ctx.fontName, size: headingSize)
+                    ?? .systemFont(ofSize: headingSize))
             let lineHeight = ceil(headingFont.ascender - headingFont.descender + headingFont.leading) + 1
             let headingPara = NSMutableParagraphStyle()
             headingPara.minimumLineHeight = lineHeight
@@ -558,7 +564,15 @@ enum MarkdownASTStyler {
             headingPara.paragraphSpacingBefore = headingFont.pointSize * ctx.config.headings.topSpacingEm(for: level)
             headingPara.paragraphSpacing = ctx.baseParagraphSpacing
             attrs.append((ctx.ns.paragraphRange(for: range), [.paragraphStyle: headingPara]))
-            attrs.append((range, [.font: headingFont]))
+            // theme.headingText paints the whole heading line; the marker loop
+            // and the inline descent below both append LATER, so `#` glyphs
+            // keep headingMarker and links / code keep their own ink — the
+            // same later-range-wins layering the bodyText default relies on.
+            var headingAttrs: [NSAttributedString.Key: Any] = [.font: headingFont]
+            if let headingText = ctx.theme.headingText {
+                headingAttrs[.foregroundColor] = headingText
+            }
+            attrs.append((range, headingAttrs))
             for marker in markers {
                 attrs.append((marker, [.foregroundColor: ctx.theme.headingMarker]))
             }

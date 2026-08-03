@@ -349,15 +349,30 @@ public struct TaskCheckboxStyle: Sendable {
 /// Per-level heading metrics. Defaults follow the historical Nodes ratios,
 /// which are loosely based on browser default heading sizes.
 public struct HeadingStyle: Sendable {
+    /// PostScript name of the typeface used for heading text, for example
+    /// `"AvenirNext-DemiBold"`. `nil` (the default) keeps the historical
+    /// behavior: headings render in the editor's base font with the bold
+    /// trait added.
+    ///
+    /// The name is honored exactly, so the chosen face's weight and style
+    /// are respected — pick a `-Bold` / `-Semibold` face for heavier
+    /// headings. Emphasis inside a heading still composes on top of it:
+    /// bold / italic add their traits while the family and the per-level
+    /// size are kept. A name that doesn't resolve falls back to the default
+    /// heading font at draw time, so a typo degrades to the stock look
+    /// instead of changing metrics.
+    public var fontName: String?
     /// Font-size multiplier per heading level (1...6).
     public var fontMultipliers: [CGFloat]
     /// Top spacing in `em` units per heading level (1...6).
     public var topSpacingEm: [CGFloat]
 
     public init(
+        fontName: String? = nil,
         fontMultipliers: [CGFloat] = [2.0, 1.5, 1.17, 1.0, 0.83, 0.67],
         topSpacingEm: [CGFloat] = [0.35, 0.30, 0.25, 0.20, 0.15, 0.10]
     ) {
+        self.fontName = fontName
         self.fontMultipliers = fontMultipliers
         self.topSpacingEm = topSpacingEm
     }
