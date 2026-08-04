@@ -639,10 +639,23 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
             let boxRect = CGRect(x: alignToPixel(boxX), y: alignToPixel(boxY), width: size, height: size)
             guard !boxRect.isEmpty, !boxRect.isNull else { return }
 
-            let iconInset = max(0.0, size * 0.01)
-            let iconRect = boxRect.insetBy(dx: iconInset, dy: iconInset)
             let configuration = (textLayoutManager?.textContainer?.textView as? NativeTextView)?.configuration
                 ?? .default
+
+            // A service-supplied checkbox image replaces the stock SF-symbol
+            // box entirely; geometry and hit-testing stay engine-owned either
+            // way, so a custom renderer only changes the pixels in boxRect.
+            if let custom = configuration.services.taskCheckboxes.image(
+                checked: isChecked,
+                size: boxRect.width,
+                appearance: textLayoutManager?.textContainer?.textView?.effectiveAppearance
+            ) {
+                custom.draw(in: boxRect)
+                return
+            }
+
+            let iconInset = max(0.0, size * 0.01)
+            let iconRect = boxRect.insetBy(dx: iconInset, dy: iconInset)
             let style = configuration.taskCheckbox
             let symbolName = isChecked ? style.checkedSymbolName : style.uncheckedSymbolName
             let fallbackName = isChecked

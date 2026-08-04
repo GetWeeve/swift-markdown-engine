@@ -184,6 +184,36 @@ public struct NoOpLatexRenderer: LatexRenderer {
     public func render(latex: String, fontSize: CGFloat, theme: MarkdownEditorTheme) -> LatexRenderResult? { nil }
 }
 
+// MARK: - Task Checkboxes
+
+/// Supplies the image drawn for task-list checkboxes (`- [ ]` / `- [x]`).
+///
+/// The engine's stock rendering is an SF-symbol square tinted from the theme.
+/// Embedders whose design system has its own checkbox glyph implement this
+/// protocol and return a ready-to-draw image; the engine keeps ownership of
+/// the box's geometry (position, size) and of hit-testing, so a custom image
+/// changes only the pixels inside the box rect.
+public protocol TaskCheckboxRenderer: Sendable {
+    /// Return the image for one checkbox state, or `nil` to fall back to the
+    /// engine's stock SF-symbol rendering for this call.
+    ///
+    /// - Parameters:
+    ///   - checked: Whether the box renders the checked state.
+    ///   - size: Side length of the square box rect, in points.
+    ///   - appearance: The text view's effective appearance at draw time, so
+    ///     implementations can resolve light/dark variants.
+    ///
+    /// Called synchronously on the main thread during fragment drawing;
+    /// implementations should cache per (checked, size, appearance).
+    func image(checked: Bool, size: CGFloat, appearance: NSAppearance?) -> NSImage?
+}
+
+/// Default renderer that always defers to the engine's stock SF-symbol box.
+public struct SystemTaskCheckboxRenderer: TaskCheckboxRenderer {
+    public init() {}
+    public func image(checked: Bool, size: CGFloat, appearance: NSAppearance?) -> NSImage? { nil }
+}
+
 // MARK: - Event Bus
 
 /// Optional notification-name bridge that lets the editor communicate with
@@ -319,6 +349,7 @@ public struct MarkdownEditorServices: Sendable {
     public var images: any EmbeddedImageProvider
     public var syntaxHighlighter: any SyntaxHighlighter
     public var latex: any LatexRenderer
+    public var taskCheckboxes: any TaskCheckboxRenderer
     public var bus: MarkdownEditorBus
 
     public init(
@@ -326,12 +357,14 @@ public struct MarkdownEditorServices: Sendable {
         images: any EmbeddedImageProvider = NoOpEmbeddedImageProvider(),
         syntaxHighlighter: any SyntaxHighlighter = PlainTextSyntaxHighlighter(),
         latex: any LatexRenderer = NoOpLatexRenderer(),
+        taskCheckboxes: any TaskCheckboxRenderer = SystemTaskCheckboxRenderer(),
         bus: MarkdownEditorBus = .default
     ) {
         self.wikiLinks = wikiLinks
         self.images = images
         self.syntaxHighlighter = syntaxHighlighter
         self.latex = latex
+        self.taskCheckboxes = taskCheckboxes
         self.bus = bus
     }
 

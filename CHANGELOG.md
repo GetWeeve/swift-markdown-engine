@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `TaskCheckboxRenderer` service (`MarkdownEditorServices.taskCheckboxes`):
+  embedders can supply the image drawn for task-list checkboxes — for example
+  a design-system box — while the engine keeps ownership of the box's
+  geometry, invalidation, and click hit-testing. The default
+  `SystemTaskCheckboxRenderer` defers to the stock SF-symbol rendering, so
+  behavior is unchanged unless a renderer is injected.
 - Checked-task treatment knobs: `TaskCheckboxStyle.strikethroughCompletedTasks`
   gates the completed label's strikethrough (default on, as before),
   `MarkdownEditorTheme.completedTaskText` colors the completed label (nil =
