@@ -32,6 +32,7 @@ public struct MarkdownEditorConfiguration: Sendable {
     public var codeBlock: CodeBlockStyle
     public var inlineCode: InlineCodeStyle
     public var lists: ListStyle
+    public var table: TableStyle
     public var taskCheckbox: TaskCheckboxStyle
     public var headings: HeadingStyle
     public var imageEmbed: ImageEmbedStyle
@@ -92,6 +93,7 @@ public struct MarkdownEditorConfiguration: Sendable {
         codeBlock: CodeBlockStyle = .default,
         inlineCode: InlineCodeStyle = .default,
         lists: ListStyle = .default,
+        table: TableStyle = .default,
         taskCheckbox: TaskCheckboxStyle = .default,
         headings: HeadingStyle = .default,
         imageEmbed: ImageEmbedStyle = .default,
@@ -118,6 +120,7 @@ public struct MarkdownEditorConfiguration: Sendable {
         self.codeBlock = codeBlock
         self.inlineCode = inlineCode
         self.lists = lists
+        self.table = table
         self.taskCheckbox = taskCheckbox
         self.headings = headings
         self.imageEmbed = imageEmbed
@@ -475,6 +478,24 @@ public struct BlockquoteStyle: Sendable {
     }
 
     public static let `default` = BlockquoteStyle()
+}
+
+// MARK: - Tables
+
+/// GFM table wrapper rendering knobs.
+public struct TableStyle: Sendable {
+    /// Corner radius of the rendered table's outer wrapper. The interior
+    /// painting (header fill, separator rules) is clipped to the rounded
+    /// shape and the outer border rule is stroked along the rounded path,
+    /// so the rules stay crisp at the corners. `0` (the default) keeps the
+    /// historical square-cornered rendering exactly.
+    public var cornerRadius: CGFloat
+
+    public init(cornerRadius: CGFloat = 0) {
+        self.cornerRadius = max(0, cornerRadius)
+    }
+
+    public static let `default` = TableStyle()
 }
 
 // MARK: - Links
