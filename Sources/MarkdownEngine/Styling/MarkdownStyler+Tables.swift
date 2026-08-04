@@ -61,10 +61,14 @@ extension MarkdownStyler {
 
     private static func themeKeyPrefix(ctx: StylingContext, appearance: NSAppearance) -> String {
         let theme = ctx.configuration.theme
+        func optionalIdentity(_ color: NSColor?) -> String {
+            color.map { "\(ObjectIdentifier($0))" } ?? "nil"
+        }
         let identity = "\(ctx.baseFont.fontName)|\(ctx.baseFont.pointSize)|\(appearance.name.rawValue)|"
             + "\(ObjectIdentifier(theme.bodyText))|\(ObjectIdentifier(theme.mutedText))|"
             + "\(ObjectIdentifier(theme.highlightColor))|\(ObjectIdentifier(ctx.codeBackgroundColor))|"
             + "\(ObjectIdentifier(theme.latexLightModeText))|\(ObjectIdentifier(theme.latexDarkModeText))|"
+            + "\(optionalIdentity(theme.tableHeaderBackground))|\(optionalIdentity(theme.tableRule))|"
             + "\(ObjectIdentifier(type(of: ctx.services.latex)))"
 
         themeKeyLock.lock()
@@ -87,6 +91,8 @@ extension MarkdownStyler {
             colorKey(ctx.codeBackgroundColor, under: appearance),
             colorKey(theme.latexLightModeText, under: appearance),
             colorKey(theme.latexDarkModeText, under: appearance),
+            theme.tableHeaderBackground.map { colorKey($0, under: appearance) } ?? "nil",
+            theme.tableRule.map { colorKey($0, under: appearance) } ?? "nil",
             "\(ObjectIdentifier(type(of: ctx.services.latex)))",
         ].joined(separator: "|")
 
@@ -460,14 +466,17 @@ extension MarkdownStyler {
         let cellVPadding: CGFloat = 6
         let borderWidth: CGFloat = 1
         // Resolve under the real appearance: `.withAlphaComponent()` freezes a dynamic color otherwise.
-        func mutedColor(alpha: CGFloat) -> NSColor {
-            var resolved: NSColor = theme.mutedText
+        func resolved(_ color: NSColor) -> NSColor {
+            var result = color
             appearance.performAsCurrentDrawingAppearance {
-                resolved = theme.mutedText.usingColorSpace(.sRGB) ?? theme.mutedText
+                result = color.usingColorSpace(.sRGB) ?? color
             }
-            return resolved.withAlphaComponent(alpha)
+            return result
         }
-        let borderColor = mutedColor(alpha: 0.5)
+        func mutedColor(alpha: CGFloat) -> NSColor {
+            resolved(theme.mutedText).withAlphaComponent(alpha)
+        }
+        let borderColor = theme.tableRule.map(resolved) ?? mutedColor(alpha: 0.5)
         let baseLineHeight: CGFloat = ceil(baseFont.ascender - baseFont.descender + baseFont.leading)
         let minColumnContentWidth: CGFloat = 16
 
@@ -598,7 +607,7 @@ extension MarkdownStyler {
         }
 
         let alignments = table.alignments
-        let headerFill = mutedColor(alpha: 0.08)
+        let headerFill = theme.tableHeaderBackground.map(resolved) ?? mutedColor(alpha: 0.08)
 
         // Flipped image so AppKit handles the y-flip; a manual transform mirror would flip glyphs too.
         return NSImage(size: size, flipped: true) { _ in

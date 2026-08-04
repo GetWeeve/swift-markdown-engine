@@ -52,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   face unless set independently), and `MarkdownEditorTheme.codeBackground`
   replaces the background behind fenced blocks and inline spans (nil = the
   service's background, as before).
+- Table theming slots: `MarkdownEditorTheme.tableHeaderBackground` fills the
+  rendered header row (nil = the historical mutedText at 8% alpha) and
+  `MarkdownEditorTheme.tableRule` strokes the outer border and internal
+  rules (nil = mutedText at 50% alpha). Both participate in the table image
+  cache key.
 - Custom heading typeface and color: `HeadingStyle.fontName` renders headings
   in a specific PostScript face (honored exactly, so the chosen weight is
   respected; an unresolvable name falls back to the stock bold base font),
