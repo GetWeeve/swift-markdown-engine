@@ -427,20 +427,28 @@ public struct ListStyle: Sendable {
 /// example `"circle"` / `"checkmark.circle.fill"`. A name that doesn't
 /// resolve falls back to the corresponding default symbol at draw time, so a
 /// typo degrades to the stock look instead of drawing nothing. Tint colors
-/// stay theme-driven (`MarkdownEditorTheme/mutedText` unchecked,
-/// `MarkdownEditorTheme/bodyText` checked).
+/// are theme-driven: ``MarkdownEditorTheme/taskCheckboxUnchecked`` /
+/// ``MarkdownEditorTheme/taskCheckboxChecked``, which default to
+/// `mutedText` unchecked and `bodyText` checked.
 public struct TaskCheckboxStyle: Sendable {
     /// SF Symbol drawn for an unchecked task item (`[ ]`).
     public var uncheckedSymbolName: String
     /// SF Symbol drawn for a checked task item (`[x]`).
     public var checkedSymbolName: String
+    /// Whether a checked item's label is struck through. `true` (the
+    /// default) keeps the historical rendering. Designs that mark completion
+    /// by ink alone can turn this off and set
+    /// ``MarkdownEditorTheme/completedTaskText`` instead.
+    public var strikethroughCompletedTasks: Bool
 
     public init(
         uncheckedSymbolName: String = "square",
-        checkedSymbolName: String = "checkmark.square.fill"
+        checkedSymbolName: String = "checkmark.square.fill",
+        strikethroughCompletedTasks: Bool = true
     ) {
         self.uncheckedSymbolName = uncheckedSymbolName
         self.checkedSymbolName = checkedSymbolName
+        self.strikethroughCompletedTasks = strikethroughCompletedTasks
     }
 
     public static let `default` = TaskCheckboxStyle()
