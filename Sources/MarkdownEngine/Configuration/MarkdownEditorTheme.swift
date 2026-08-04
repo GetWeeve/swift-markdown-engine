@@ -95,6 +95,12 @@ public struct MarkdownEditorTheme: Sendable {
     /// syntax-highlighter service's background color.
     public var codeBackground: NSColor?
 
+    /// Background color of the inline-code CHIP
+    /// (``InlineCodeStyle/chipCornerRadius`` set). `nil` (the default) falls
+    /// back to ``codeBackground`` and then to the syntax-highlighter
+    /// service's background color.
+    public var inlineCodeBackground: NSColor?
+
     // MARK: Init
 
     public init(
@@ -111,7 +117,8 @@ public struct MarkdownEditorTheme: Sendable {
         latexDarkModeText: NSColor = .white,
         strikethroughColor: NSColor = .labelColor,
         highlightColor: NSColor = .systemOrange.withAlphaComponent(0.4),
-        codeBackground: NSColor? = nil
+        codeBackground: NSColor? = nil,
+        inlineCodeBackground: NSColor? = nil
     ) {
         self.bodyText = bodyText
         self.mutedText = mutedText
@@ -127,6 +134,7 @@ public struct MarkdownEditorTheme: Sendable {
         self.strikethroughColor = strikethroughColor
         self.highlightColor = highlightColor
         self.codeBackground = codeBackground
+        self.inlineCodeBackground = inlineCodeBackground
     }
 
     /// System-native palette built from `NSColor` dynamic system colors.

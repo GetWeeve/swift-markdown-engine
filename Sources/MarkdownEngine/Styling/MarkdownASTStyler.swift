@@ -699,9 +699,23 @@ enum MarkdownASTStyler {
 
     private static func styleCodeBlock(range: NSRange, ctx: Ctx, into attrs: inout [StyledRange]) {
         let parts = codeBlockParts(range, ctx.ns)
-        attrs.append((parts.codeRange, [
-            .font: ctx.codeFont, .backgroundColor: ctx.codeBackground, .paragraphStyle: ctx.codeParagraphStyle,
-        ]))
+        let cardMode = ctx.config.codeBlock.cornerRadius != nil
+        if cardMode {
+            // Card mode (CodeBlockStyle.cornerRadius): the fragment paints ONE
+            // continuous rounded card over the whole block, keyed off
+            // `.codeBlockCard` (which carries the block range so each
+            // fragment knows whether it holds the block's first/last line).
+            // No `.backgroundColor` — the square glyph-run fill would sit on
+            // top of the card.
+            attrs.append((parts.codeRange, [
+                .font: ctx.codeFont, .paragraphStyle: ctx.codeParagraphStyle,
+                .codeBlockCard: NSValue(range: parts.codeRange),
+            ]))
+        } else {
+            attrs.append((parts.codeRange, [
+                .font: ctx.codeFont, .backgroundColor: ctx.codeBackground, .paragraphStyle: ctx.codeParagraphStyle,
+            ]))
+        }
         // Suppress spell-check underlines on the whole fenced block — code is not prose.
         attrs.append((parts.codeRange, [.spellingState: 0]))
         let codeContent = ctx.ns.substring(with: parts.content)
@@ -718,6 +732,20 @@ enum MarkdownASTStyler {
             : [.foregroundColor: NSColor.clear, .font: ctx.codeFont]   // hiddenMarkerFont == codeFont
         attrs.append((parts.openFence, markerAttrs))
         attrs.append((parts.closeFence, markerAttrs))
+
+        // Card interior padding: pin the HIDDEN fence lines' height so the
+        // fence rows read as the card's vertical padding above the first and
+        // below the last code line. While the caret reveals the fences they
+        // keep the natural code line height for comfortable editing.
+        if cardMode, let pad = ctx.config.codeBlock.cardVerticalPadding, !ctx.isActive(range) {
+            guard let fencePara = ctx.codeParagraphStyle.mutableCopy() as? NSMutableParagraphStyle else { return }
+            fencePara.minimumLineHeight = pad
+            fencePara.maximumLineHeight = pad
+            attrs.append((ctx.ns.paragraphRange(for: parts.openFence), [.paragraphStyle: fencePara]))
+            if parts.closeFence.length > 0 {
+                attrs.append((ctx.ns.paragraphRange(for: parts.closeFence), [.paragraphStyle: fencePara]))
+            }
+        }
     }
 
     /// Split a fenced-code range into open fence (+language), content, close fence, and language.
@@ -775,7 +803,15 @@ enum MarkdownASTStyler {
                 styleInlines(node.children, font: font, ctx: ctx, into: &attrs)
 
             case .code(let range, let contentRange):
-                attrs.append((contentRange, [.font: ctx.inlineCodeFont, .backgroundColor: ctx.codeBackground]))
+                if ctx.config.inlineCode.chipCornerRadius != nil {
+                    // Chip mode (InlineCodeStyle.chipCornerRadius): the
+                    // fragment paints a rounded chip hugging the span; the
+                    // square glyph-run fill would fight it, so no
+                    // `.backgroundColor` here.
+                    attrs.append((contentRange, [.font: ctx.inlineCodeFont, .inlineCodeChip: true]))
+                } else {
+                    attrs.append((contentRange, [.font: ctx.inlineCodeFont, .backgroundColor: ctx.codeBackground]))
+                }
                 // Suppress spell-check underlines on inline `code` spans (markers + content).
                 attrs.append((range, [.spellingState: 0]))
                 let markerAttrs: [NSAttributedString.Key: Any] = ctx.isActive(range)

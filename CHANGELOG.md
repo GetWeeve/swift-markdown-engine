@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Code-block CARD rendering (opt-in): `CodeBlockStyle.cornerRadius` draws a
+  fenced block as one continuous rounded card spanning the whole block —
+  wrapped lines included — instead of square per-paragraph fills, and
+  `CodeBlockStyle.cardVerticalPadding` pins the hidden fence lines' height so
+  they read as the card's interior padding (fences revert to their natural
+  height while the caret reveals them). Selection stays visible above the
+  card. `nil` (the default) keeps the historical rendering exactly.
+- Inline-code CHIP rendering (opt-in): `InlineCodeStyle.chipCornerRadius`
+  draws a small rounded background hugging each inline `code` span (per
+  wrapped line) with `chipHorizontalPadding` of breathing room, replacing the
+  square glyph-run fill. `MarkdownEditorTheme.inlineCodeBackground` colors the
+  chip (nil = `codeBackground`, then the syntax-highlighter background).
 - Code typography and background knobs: `CodeBlockStyle.fontName` and
   `InlineCodeStyle.fontName` swap the code face (nil = the
   syntax-highlighter service's font, as before; inline follows the block
