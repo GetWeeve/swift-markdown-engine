@@ -366,15 +366,27 @@ public struct HeadingStyle: Sendable {
     public var fontMultipliers: [CGFloat]
     /// Top spacing in `em` units per heading level (1...6).
     public var topSpacingEm: [CGFloat]
+    /// Fixed line heights (points) per heading level (1...6). Empty (the
+    /// default) keeps the historical behavior of deriving the line height
+    /// from the resolved heading font's metrics. Levels beyond the array's
+    /// count reuse its last entry, mirroring `fontMultipliers`.
+    public var lineHeights: [CGFloat]
+    /// Spacing (points) below a heading. `nil` (the default) keeps the
+    /// historical behavior of using the editor's base paragraph spacing.
+    public var paragraphSpacing: CGFloat?
 
     public init(
         fontName: String? = nil,
         fontMultipliers: [CGFloat] = [2.0, 1.5, 1.17, 1.0, 0.83, 0.67],
-        topSpacingEm: [CGFloat] = [0.35, 0.30, 0.25, 0.20, 0.15, 0.10]
+        topSpacingEm: [CGFloat] = [0.35, 0.30, 0.25, 0.20, 0.15, 0.10],
+        lineHeights: [CGFloat] = [],
+        paragraphSpacing: CGFloat? = nil
     ) {
         self.fontName = fontName
         self.fontMultipliers = fontMultipliers
         self.topSpacingEm = topSpacingEm
+        self.lineHeights = lineHeights
+        self.paragraphSpacing = paragraphSpacing
     }
 
     public func fontMultiplier(for level: Int) -> CGFloat {
@@ -385,6 +397,14 @@ public struct HeadingStyle: Sendable {
     public func topSpacingEm(for level: Int) -> CGFloat {
         let index = max(1, min(level, topSpacingEm.count)) - 1
         return topSpacingEm[index]
+    }
+
+    /// Fixed line height for `level`, or `nil` when the level should fall
+    /// back to font-metric derivation (i.e. `lineHeights` is empty).
+    public func lineHeight(for level: Int) -> CGFloat? {
+        guard !lineHeights.isEmpty else { return nil }
+        let index = max(1, min(level, lineHeights.count)) - 1
+        return lineHeights[index]
     }
 
     public static let `default` = HeadingStyle()

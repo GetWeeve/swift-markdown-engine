@@ -557,12 +557,13 @@ enum MarkdownASTStyler {
                 .flatMap { NSFont(name: $0, size: headingSize) }
                 ?? adding(.bold, to: NSFont(name: ctx.fontName, size: headingSize)
                     ?? .systemFont(ofSize: headingSize))
-            let lineHeight = ceil(headingFont.ascender - headingFont.descender + headingFont.leading) + 1
+            let lineHeight = ctx.config.headings.lineHeight(for: level)
+                ?? ceil(headingFont.ascender - headingFont.descender + headingFont.leading) + 1
             let headingPara = NSMutableParagraphStyle()
             headingPara.minimumLineHeight = lineHeight
             headingPara.maximumLineHeight = lineHeight
             headingPara.paragraphSpacingBefore = headingFont.pointSize * ctx.config.headings.topSpacingEm(for: level)
-            headingPara.paragraphSpacing = ctx.baseParagraphSpacing
+            headingPara.paragraphSpacing = ctx.config.headings.paragraphSpacing ?? ctx.baseParagraphSpacing
             attrs.append((ctx.ns.paragraphRange(for: range), [.paragraphStyle: headingPara]))
             // theme.headingText paints the whole heading line; the marker loop
             // and the inline descent below both append LATER, so `#` glyphs

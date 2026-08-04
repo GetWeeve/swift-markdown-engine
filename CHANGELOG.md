@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Heading metric knobs: `HeadingStyle.lineHeights` pins fixed per-level line
+  heights (empty = derived from the resolved heading font's metrics, as
+  before) and `HeadingStyle.paragraphSpacing` sets the below-heading gap
+  independently (nil = the editor's base paragraph spacing, as before).
 - Custom heading typeface and color: `HeadingStyle.fontName` renders headings
   in a specific PostScript face (honored exactly, so the chosen weight is
   respected; an unresolvable name falls back to the stock bold base font),
