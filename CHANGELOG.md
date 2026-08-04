@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the editor's window isn't key.
 
 ### Added
+- `MarkdownEditorTheme.tableRowBackground` fills a rendered table's body rows
+  (everything below the header). `nil` (the default) keeps the historical
+  unfilled body. The fill clips inside a rounded wrapper, interior rules and
+  the outer border stroke on top, and the slot participates in the table
+  image cache key.
 - `TableStyle.verticalRules` (default `true`) controls interior column
   separators in rendered tables. When `false`, only the outer border and the
   horizontal rules between rows (including the header/body rule) draw, with
