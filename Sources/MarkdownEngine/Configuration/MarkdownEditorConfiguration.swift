@@ -91,6 +91,12 @@ public struct MarkdownEditorConfiguration: Sendable {
     /// helpers; turn off when the embedder owns these keys. Plain ⌘K is
     /// never consumed — it is a common embedder binding (command palettes).
     public var formattingShortcutsEnabled: Bool
+    /// Duration of the caret-follow scroll in `.scrolls` mode, when typing or
+    /// caret movement pushes the caret out of the viewport. `0` (the default)
+    /// keeps the historical instant jump; a short duration (0.1–0.2s) gives a
+    /// smooth ease-out follow with no bounce. Ignored in `.fitsContent`
+    /// (the enclosing page scroller owns the reveal there).
+    public var caretFollowAnimationDuration: CGFloat
 
     public init(
         theme: MarkdownEditorTheme = .default,
@@ -119,7 +125,8 @@ public struct MarkdownEditorConfiguration: Sendable {
         rawSourceMode: Bool = false,
         extensions: [any MarkdownExtension] = [],
         cursorFollowsSpanInk: Bool = false,
-        formattingShortcutsEnabled: Bool = true
+        formattingShortcutsEnabled: Bool = true,
+        caretFollowAnimationDuration: CGFloat = 0
     ) {
         self.theme = theme
         self.services = services
@@ -148,6 +155,7 @@ public struct MarkdownEditorConfiguration: Sendable {
         self.extensions = extensions
         self.cursorFollowsSpanInk = cursorFollowsSpanInk
         self.formattingShortcutsEnabled = formattingShortcutsEnabled
+        self.caretFollowAnimationDuration = max(0, caretFollowAnimationDuration)
     }
 
     public static let `default` = MarkdownEditorConfiguration()
