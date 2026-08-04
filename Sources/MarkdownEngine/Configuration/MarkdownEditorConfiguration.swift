@@ -85,6 +85,12 @@ public struct MarkdownEditorConfiguration: Sendable {
     /// so this stays the embedder's explicit decision rather than something the
     /// engine infers from a color it happens to see.
     public var cursorFollowsSpanInk: Bool
+    /// Inline-formatting key equivalents (⌘B bold, ⌘I italic, ⌘E inline
+    /// code, ⌘⇧K link scaffold), driving the same toggleable wrap/unwrap
+    /// actions the context menu exposes. On by default, like the list
+    /// helpers; turn off when the embedder owns these keys. Plain ⌘K is
+    /// never consumed — it is a common embedder binding (command palettes).
+    public var formattingShortcutsEnabled: Bool
 
     public init(
         theme: MarkdownEditorTheme = .default,
@@ -112,7 +118,8 @@ public struct MarkdownEditorConfiguration: Sendable {
         heightBehavior: HeightBehavior = .scrolls,
         rawSourceMode: Bool = false,
         extensions: [any MarkdownExtension] = [],
-        cursorFollowsSpanInk: Bool = false
+        cursorFollowsSpanInk: Bool = false,
+        formattingShortcutsEnabled: Bool = true
     ) {
         self.theme = theme
         self.services = services
@@ -140,6 +147,7 @@ public struct MarkdownEditorConfiguration: Sendable {
         self.rawSourceMode = rawSourceMode
         self.extensions = extensions
         self.cursorFollowsSpanInk = cursorFollowsSpanInk
+        self.formattingShortcutsEnabled = formattingShortcutsEnabled
     }
 
     public static let `default` = MarkdownEditorConfiguration()
