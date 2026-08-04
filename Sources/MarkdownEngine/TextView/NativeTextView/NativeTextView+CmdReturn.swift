@@ -19,6 +19,7 @@ extension NativeTextView {
            handler(.confirmAndOpen) {
             return true
         }
+        if handleFormattingShortcut(event) { return true }
         return super.performKeyEquivalent(with: event)
     }
 }

@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Inline-formatting keyboard shortcuts: ⌘B (bold), ⌘I (italic), ⌘E
+  (inline code), and ⌘⇧K (link scaffold) drive the same toggleable
+  wrap/unwrap actions the context menu exposes. Gated by
+  `MarkdownEditorConfiguration.formattingShortcutsEnabled` (default on,
+  like the list helpers). Plain ⌘K is never consumed — it is a common
+  embedder binding (command palettes).
 - Custom heading typeface and color: `HeadingStyle.fontName` renders headings
   in a specific PostScript face (honored exactly, so the chosen weight is
   respected; an unresolvable name falls back to the stock bold base font),
