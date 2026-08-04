@@ -249,6 +249,11 @@ public struct MarkerStyle: Sendable {
 
 /// Styling for fenced code blocks (```language ... ```).
 public struct CodeBlockStyle: Sendable {
+    /// PostScript name of the typeface used for code-block text, for example
+    /// `"GeistMono-Regular"`. `nil` (the default) keeps the historical
+    /// behavior: the syntax-highlighter service's code font. A name that
+    /// doesn't resolve degrades to that service font as well.
+    public var fontName: String?
     /// Code-block font size as a fraction of the document base font size.
     public var fontSizeScale: CGFloat
     /// Vertical paragraph spacing applied above and below the code block.
@@ -257,10 +262,12 @@ public struct CodeBlockStyle: Sendable {
     public var horizontalIndent: CGFloat
 
     public init(
+        fontName: String? = nil,
         fontSizeScale: CGFloat = 0.85,
         paragraphSpacing: CGFloat = 2.0,
         horizontalIndent: CGFloat = 12.0
     ) {
+        self.fontName = fontName
         self.fontSizeScale = fontSizeScale
         self.paragraphSpacing = paragraphSpacing
         self.horizontalIndent = horizontalIndent
@@ -275,9 +282,15 @@ public struct CodeBlockStyle: Sendable {
 public struct InlineCodeStyle: Sendable {
     /// Inline-code reuses the code block font size scale by default.
     public var fontSizeScale: CGFloat
+    /// PostScript name of the typeface used for inline-code text. `nil`
+    /// (the default) keeps the historical behavior: inline code renders in
+    /// the code-block font. A name that doesn't resolve degrades the same
+    /// way.
+    public var fontName: String?
 
-    public init(fontSizeScale: CGFloat = 0.85) {
+    public init(fontSizeScale: CGFloat = 0.85, fontName: String? = nil) {
         self.fontSizeScale = fontSizeScale
+        self.fontName = fontName
     }
 
     public static let `default` = InlineCodeStyle()

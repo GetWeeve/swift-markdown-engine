@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Code typography and background knobs: `CodeBlockStyle.fontName` and
+  `InlineCodeStyle.fontName` swap the code face (nil = the
+  syntax-highlighter service's font, as before; inline follows the block
+  face unless set independently), and `MarkdownEditorTheme.codeBackground`
+  replaces the background behind fenced blocks and inline spans (nil = the
+  service's background, as before).
 - Custom heading typeface and color: `HeadingStyle.fontName` renders headings
   in a specific PostScript face (honored exactly, so the chosen weight is
   respected; an unresolvable name falls back to the stock bold base font),
