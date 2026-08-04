@@ -152,7 +152,11 @@ extension MarkdownStyler {
         // highlighted under one config and literal under another — those must
         // never share a cached image.
         let extensionKey = ctx.configuration.extensionRegistry.fingerprint
-        let key = (themeKeyPrefix(ctx: ctx, appearance: appearance) + "|x\(extensionKey)|w\(widthKey)|" + source) as NSString
+        // The wrapper radius changes the rendered pixels, so it is part of
+        // the cache identity like every other rendering input.
+        let radiusKey = ctx.configuration.table.cornerRadius
+        let key = (themeKeyPrefix(ctx: ctx, appearance: appearance)
+            + "|x\(extensionKey)|w\(widthKey)|r\(radiusKey)|" + source) as NSString
         if let cached = tableImageCache.object(forKey: key) {
             return (cached, false)
         }
@@ -164,7 +168,8 @@ extension MarkdownStyler {
             latex: ctx.services.latex,
             appearance: appearance,
             availableWidth: availableWidth,
-            extensions: ctx.configuration.extensions
+            extensions: ctx.configuration.extensions,
+            cornerRadius: ctx.configuration.table.cornerRadius
         )
         tableImageCache.setObject(image, forKey: key)
         return (image, true)
@@ -459,7 +464,8 @@ extension MarkdownStyler {
         latex: any LatexRenderer,
         appearance: NSAppearance,
         availableWidth: CGFloat,
-        extensions: [any MarkdownExtension] = []
+        extensions: [any MarkdownExtension] = [],
+        cornerRadius: CGFloat = 0
     ) -> NSImage {
         let columnCount = table.alignments.count
         let cellHPadding: CGFloat = 12
@@ -609,8 +615,29 @@ extension MarkdownStyler {
         let alignments = table.alignments
         let headerFill = theme.tableHeaderBackground.map(resolved) ?? mutedColor(alpha: 0.08)
 
+        // Clamp so tiny tables can't invert the rounded path.
+        let radius = max(0, min(cornerRadius, min(size.width, size.height) / 2 - borderWidth))
+        let outerRect = NSRect(
+            x: borderWidth / 2,
+            y: borderWidth / 2,
+            width: size.width - borderWidth,
+            height: size.height - borderWidth
+        )
+
         // Flipped image so AppKit handles the y-flip; a manual transform mirror would flip glyphs too.
         return NSImage(size: size, flipped: true) { _ in
+            // Rounded wrapper: the outer border stroke runs along the rounded
+            // path, and the interior painting (header fill, separator rule
+            // ends) is clipped to it so nothing pokes out of the corners.
+            let outer = radius > 0
+                ? NSBezierPath(roundedRect: outerRect, xRadius: radius, yRadius: radius)
+                : NSBezierPath(rect: outerRect)
+
+            if radius > 0 {
+                NSGraphicsContext.saveGraphicsState()
+                outer.addClip()
+            }
+
             // Header row fill
             headerFill.setFill()
             NSBezierPath(rect: NSRect(
@@ -619,17 +646,6 @@ extension MarkdownStyler {
                 width: size.width - 2 * borderWidth,
                 height: rowContentHeights[0] + 2 * cellVPadding
             )).fill()
-
-            // Outer border
-            borderColor.setStroke()
-            let outer = NSBezierPath(rect: NSRect(
-                x: borderWidth / 2,
-                y: borderWidth / 2,
-                width: size.width - borderWidth,
-                height: size.height - borderWidth
-            ))
-            outer.lineWidth = borderWidth
-            outer.stroke()
 
             // Internal separators
             let separators = NSBezierPath()
@@ -645,6 +661,14 @@ extension MarkdownStyler {
                 separators.line(to: NSPoint(x: size.width, y: y))
             }
             separators.stroke()
+
+            if radius > 0 { NSGraphicsContext.restoreGraphicsState() }
+
+            // Outer border — stroked unclipped so the rule stays crisp at
+            // the rounded corners.
+            borderColor.setStroke()
+            outer.lineWidth = borderWidth
+            outer.stroke()
 
             func drawCell(_ s: NSAttributedString, col: Int, row: Int) {
                 guard col < columnCount else { return }

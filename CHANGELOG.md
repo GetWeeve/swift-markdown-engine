@@ -93,6 +93,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   face unless set independently), and `MarkdownEditorTheme.codeBackground`
   replaces the background behind fenced blocks and inline spans (nil = the
   service's background, as before).
+- `TableStyle.cornerRadius` rounds the rendered table wrapper's corners:
+  interior painting (header fill, separator rules) clips to the rounded
+  shape and the outer border rule strokes along the rounded path, staying
+  crisp at the corners. `0` (the default) keeps the historical
+  square-cornered rendering exactly.
 - Table theming slots: `MarkdownEditorTheme.tableHeaderBackground` fills the
   rendered header row (nil = the historical mutedText at 8% alpha) and
   `MarkdownEditorTheme.tableRule` strokes the outer border and internal
