@@ -39,7 +39,15 @@ enum MarkdownASTStyler {
         let codeFontSize = round(fontSize * configuration.codeBlock.fontSizeScale)
         let hiddenSize = configuration.markers.hiddenMarkerFontSize
         let ns = text as NSString
-        let codeFont = configuration.services.syntaxHighlighter.codeFont(size: codeFontSize)
+        // A configured code face is honored exactly; a name that doesn't
+        // resolve degrades to the syntax-highlighter service's font, so a
+        // typo changes nothing (mirrors HeadingStyle.fontName's fallback).
+        let codeFont = configuration.codeBlock.fontName
+            .flatMap { NSFont(name: $0, size: codeFontSize) }
+            ?? configuration.services.syntaxHighlighter.codeFont(size: codeFontSize)
+        let inlineCodeFont = configuration.inlineCode.fontName
+            .flatMap { NSFont(name: $0, size: codeFontSize) }
+            ?? codeFont
         let codeLineHeight = ceil(codeFont.ascender - codeFont.descender + codeFont.leading)
         let codePara = NSMutableParagraphStyle()
         codePara.lineBreakMode = .byCharWrapping
@@ -62,7 +70,9 @@ enum MarkdownASTStyler {
             baseLineHeight: baseLineHeight,
             baseParagraphSpacing: baseParagraphSpacing,
             codeFont: codeFont,
-            codeBackground: configuration.services.syntaxHighlighter.backgroundColor(),
+            inlineCodeFont: inlineCodeFont,
+            codeBackground: configuration.theme.codeBackground
+                ?? configuration.services.syntaxHighlighter.backgroundColor(),
             codeParagraphStyle: codePara,
             inlineMarkerFont: NSFont(name: fontName, size: hiddenSize) ?? .systemFont(ofSize: hiddenSize),
             caret: caretLocation,
@@ -546,6 +556,7 @@ enum MarkdownASTStyler {
         let baseLineHeight: CGFloat
         let baseParagraphSpacing: CGFloat
         let codeFont: NSFont
+        let inlineCodeFont: NSFont
         let codeBackground: NSColor
         let codeParagraphStyle: NSParagraphStyle
         let inlineMarkerFont: NSFont
@@ -817,11 +828,11 @@ enum MarkdownASTStyler {
                 styleInlines(node.children, font: font, ctx: ctx, into: &attrs)
 
             case .code(let range, let contentRange):
-                attrs.append((contentRange, [.font: ctx.codeFont, .backgroundColor: ctx.codeBackground]))
+                attrs.append((contentRange, [.font: ctx.inlineCodeFont, .backgroundColor: ctx.codeBackground]))
                 // Suppress spell-check underlines on inline `code` spans (markers + content).
                 attrs.append((range, [.spellingState: 0]))
                 let markerAttrs: [NSAttributedString.Key: Any] = ctx.isActive(range)
-                    ? [.foregroundColor: ctx.theme.mutedText, .font: ctx.codeFont]
+                    ? [.foregroundColor: ctx.theme.mutedText, .font: ctx.inlineCodeFont]
                     : [.foregroundColor: ctx.theme.mutedText.withAlphaComponent(ctx.config.markers.inlineCodeMarkerAlpha),
                        .font: ctx.inlineMarkerFont]
                 for marker in markers(of: range, content: contentRange) { attrs.append((marker, markerAttrs)) }
