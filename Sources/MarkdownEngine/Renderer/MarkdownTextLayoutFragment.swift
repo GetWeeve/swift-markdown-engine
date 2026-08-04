@@ -553,7 +553,18 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
 
             let markerWidth = (raw as NSString).size(withAttributes: [.font: font]).width
             let glyphWidth = glyph.size(withAttributes: glyphAttrs).width
-            let xOffset = max(0, (markerWidth - glyphWidth) / 2)
+            // Fixed marker column (lists.markerSlotWidth on the grid): center
+            // the `•` in the column so bullets share the checkbox/number
+            // alignment grid. Raw reveal (selection) keeps the source
+            // position. Otherwise center on the source char's own advance.
+            let slotWidth = (self.textLayoutManager?.textContainer?.textView as? NativeTextView)?
+                .configuration.lists.effectiveMarkerSlotWidth
+            let xOffset: CGFloat
+            if let slotWidth, !isSelected {
+                xOffset = (slotWidth - glyphWidth) / 2
+            } else {
+                xOffset = max(0, (markerWidth - glyphWidth) / 2)
+            }
             // Flipped context: text origin is its top edge, baseline sits one
             // ascent below — so top = baseline − ascent aligns the glyph.
             let topY = pos.baselineY - font.ascender
@@ -594,8 +605,18 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
             let glyphAttrs: [NSAttributedString.Key: Any] = [
                 .font: font, .foregroundColor: theme.listMarker ?? theme.bodyText,
             ]
+            // Fixed marker column (lists.markerSlotWidth on the grid): center
+            // the painted marker in the column, matching bullets and the task
+            // checkbox. Raw reveal (selection) keeps the source position.
+            let slotWidth = (self.textLayoutManager?.textContainer?.textView as? NativeTextView)?
+                .configuration.lists.effectiveMarkerSlotWidth
+            let xOffset: CGFloat = {
+                guard let slotWidth, !isSelected else { return 0 }
+                let glyphWidth = glyph.size(withAttributes: glyphAttrs).width
+                return (slotWidth - glyphWidth) / 2
+            }()
             let topY = pos.baselineY - font.ascender
-            glyph.draw(at: CGPoint(x: pos.x, y: topY), withAttributes: glyphAttrs)
+            glyph.draw(at: CGPoint(x: pos.x + xOffset, y: topY), withAttributes: glyphAttrs)
         }
     }
 
@@ -632,7 +653,9 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
                 ?? .default
             let ascent = max(0, font.ascender)
             let descent = max(0, -font.descender)
-            let size = TaskCheckboxGeometry.size(for: font)
+            let size = TaskCheckboxGeometry.size(
+                for: font, slotWidth: configuration.lists.effectiveMarkerSlotWidth
+            )
             let boxX = TaskCheckboxGeometry.boxX(
                 contentX: pos.x, size: size, markerTextGap: configuration.lists.markerTextGap
             )

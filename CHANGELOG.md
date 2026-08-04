@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `ListStyle.markerSlotWidth` (opt-in, on top of the indent grid): every list
+  marker occupies an invisible fixed-width column at its depth indent — the
+  painted bullet and ordered marker center horizontally in the column (ordered
+  markers always paint in this mode), the drawn task checkbox fills it exactly
+  — and item content hangs `markerSlotWidth + markerTextGap` after the marker
+  origin, so checkbox, bullet, and number items share one alignment grid.
+  `nil` (the default) keeps the gap-only grid geometry exactly.
 - Ordered-marker lettering per depth: `ListStyle.orderedMarkerStyles` renders
   nested ordered markers as letters or roman numerals (`[.numeric,
   .lowerAlpha, .lowerRoman]` → `1.` / `a.` / `i.`, cycling below that). Only

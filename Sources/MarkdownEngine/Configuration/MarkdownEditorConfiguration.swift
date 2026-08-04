@@ -390,6 +390,22 @@ public struct ListStyle: Sendable {
     /// spacer's advance positive. Note that in grid mode literal tabs inside
     /// item CONTENT also advance by the sub-point interval.
     public var markerTextGap: CGFloat?
+    /// Width (in points) of a fixed marker COLUMN on the indent grid, shared
+    /// by every marker kind. Only takes effect together with
+    /// ``markerTextGap``; `nil` (the default) keeps the gap-only grid
+    /// geometry exactly.
+    ///
+    /// With a slot width set, every list marker occupies an invisible
+    /// fixed-width column starting at the item's depth indent:
+    /// - the painted bullet `•` and the painted ordered marker are CENTERED
+    ///   horizontally in the column (ordered markers always paint in this
+    ///   mode so the source digits' natural left alignment can't leak),
+    /// - the drawn task checkbox fills the column exactly (its square's side
+    ///   becomes `markerSlotWidth`),
+    /// - item content starts `markerSlotWidth + markerTextGap` after the
+    ///   marker origin, so checkbox, bullet, and number items share one
+    ///   alignment grid.
+    public var markerSlotWidth: CGFloat?
 
     public init(
         helpersEnabled: Bool = true,
@@ -398,7 +414,8 @@ public struct ListStyle: Sendable {
         maximumNestingLevel: Int = 3,
         extraLineHeight: CGFloat = 2,
         orderedMarkerStyles: [OrderedMarkerStyle] = [.numeric],
-        markerTextGap: CGFloat? = nil
+        markerTextGap: CGFloat? = nil,
+        markerSlotWidth: CGFloat? = nil
     ) {
         self.helpersEnabled = helpersEnabled
         self.autoClosePairsEnabled = autoClosePairsEnabled
@@ -407,6 +424,14 @@ public struct ListStyle: Sendable {
         self.extraLineHeight = extraLineHeight
         self.orderedMarkerStyles = orderedMarkerStyles
         self.markerTextGap = markerTextGap
+        self.markerSlotWidth = markerSlotWidth
+    }
+
+    /// The marker-column width actually in effect: ``markerSlotWidth`` gated
+    /// on grid mode (``markerTextGap`` set), since the slot is defined on the
+    /// grid's geometry only.
+    public var effectiveMarkerSlotWidth: CGFloat? {
+        markerTextGap != nil ? markerSlotWidth : nil
     }
 
     /// The ordered-marker style for a 0-based nesting `depth`, cycling

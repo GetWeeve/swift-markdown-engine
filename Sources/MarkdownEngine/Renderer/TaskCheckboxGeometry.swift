@@ -19,8 +19,12 @@ enum TaskCheckboxGeometry {
     /// Gap between the box's right edge and the task content's left edge.
     static let gap: CGFloat = 2.0
 
-    /// Side length of the square for the given (body) font.
-    static func size(for font: NSFont) -> CGFloat {
+    /// Side length of the square for the given (body) font. A fixed marker
+    /// column (``ListStyle/markerSlotWidth`` on the indent grid) overrides
+    /// the font-derived size: the box fills the column exactly, so checkbox,
+    /// bullet, and number markers share one alignment grid.
+    static func size(for font: NSFont, slotWidth: CGFloat? = nil) -> CGFloat {
+        if let slotWidth { return max(1.0, slotWidth) }
         let ascent = max(0, font.ascender)
         let descent = max(0, -font.descender)
         let fontHeight = max(1, ceil(ascent + descent))
