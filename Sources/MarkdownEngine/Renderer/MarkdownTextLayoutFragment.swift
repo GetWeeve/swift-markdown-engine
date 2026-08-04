@@ -37,11 +37,6 @@ extension NSAttributedString.Key {
 
 final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
 
-    /// Horizontal space (points) each blockquote nesting level occupies —
-    /// shared so the styler's text indent and the painted bars line up.
-    static let blockquoteIndentPerLevel: CGFloat = 18
-    static let blockquoteBarWidth: CGFloat = 3
-
     /// Strip below an overlay block for the legacy-small scroller (~11pt) + buffer.
     static let scrollableBlockScrollerStrip: CGFloat = 14
 
@@ -474,16 +469,19 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
         }
         guard anyLevel else { return }
 
-        let theme = (textLayoutManager?.textContainer?.textView as? NativeTextView)?
-            .configuration.theme ?? .default
-        let indentPerLevel = Self.blockquoteIndentPerLevel
-        let barWidth = Self.blockquoteBarWidth
+        let configuration = (textLayoutManager?.textContainer?.textView as? NativeTextView)?
+            .configuration ?? .default
+        let theme = configuration.theme
+        // textIndent is shared with the styler's paragraph indent so the
+        // painted bars and the hanging text line up at every level.
+        let indentPerLevel = configuration.blockquote.textIndent
+        let barWidth = configuration.blockquote.barWidth
 
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
         let nsContext = NSGraphicsContext(cgContext: context, flipped: true)
         NSGraphicsContext.current = nsContext
-        theme.mutedText.withAlphaComponent(0.5).setFill()
+        (theme.blockquoteBar ?? theme.mutedText.withAlphaComponent(0.5)).setFill()
 
         let fragLocation = fragmentNSRange?.location ?? 0
         let leftEdge = point.x - layoutFragmentFrame.origin.x

@@ -681,7 +681,7 @@ enum MarkdownASTStyler {
 
     /// Per-line blockquote: indent, mute content, hide/show `>` markers, tag first char with bar level.
     private static func styleBlockquote(range: NSRange, ctx: Ctx, into attrs: inout [StyledRange]) {
-        let indentPerLevel = MarkdownTextLayoutFragment.blockquoteIndentPerLevel
+        let indentPerLevel = ctx.config.blockquote.textIndent
         var lineStart = range.location
         let end = NSMaxRange(range)
         while lineStart < end {
@@ -724,7 +724,9 @@ enum MarkdownASTStyler {
             attrs.append((ctx.ns.paragraphRange(for: tokenRange), [.paragraphStyle: para]))
 
             if contentRange.length > 0 {
-                attrs.append((contentRange, [.foregroundColor: ctx.theme.mutedText]))
+                // theme.blockquoteText lifts the historical muting; inline
+                // constructs append later and keep their own ink either way.
+                attrs.append((contentRange, [.foregroundColor: ctx.theme.blockquoteText ?? ctx.theme.mutedText]))
             }
             if ctx.isActive(tokenRange) {
                 attrs.append((markerRange, [.foregroundColor: ctx.theme.mutedText]))

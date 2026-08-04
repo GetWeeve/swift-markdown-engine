@@ -570,7 +570,7 @@ public struct InlineLatexStyle: Sendable {
 
 // MARK: - Blockquote
 
-/// Extra line height added to blockquote lines.
+/// Metrics for blockquote lines.
 ///
 /// By default blockquote lines use the font's natural line height with no
 /// extra spacing. Set `extraLineHeight` to add breathing room, matching
@@ -579,9 +579,23 @@ public struct InlineLatexStyle: Sendable {
 public struct BlockquoteStyle: Sendable {
     /// Extra height (points) added to the default line height for blockquote lines.
     public var extraLineHeight: CGFloat
+    /// Width (points) of each painted vertical quote bar.
+    public var barWidth: CGFloat
+    /// Horizontal space (points) each blockquote nesting level occupies.
+    /// A level-`n` quote's text hangs at `n × textIndent + textIndent / 2`
+    /// and the level-`i` bar paints `textIndent / 4` into its slot — the
+    /// historical geometry, now tunable. The defaults (3pt bar, 18pt
+    /// indent) reproduce the previous hard-coded constants exactly.
+    public var textIndent: CGFloat
 
-    public init(extraLineHeight: CGFloat = 0) {
+    public init(
+        extraLineHeight: CGFloat = 0,
+        barWidth: CGFloat = 3,
+        textIndent: CGFloat = 18
+    ) {
         self.extraLineHeight = extraLineHeight
+        self.barWidth = barWidth
+        self.textIndent = textIndent
     }
 
     public static let `default` = BlockquoteStyle()
