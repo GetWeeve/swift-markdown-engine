@@ -16,9 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   configured; the default theme renders exactly as before.
 
 ### Added
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
 - `ListStyle.markerSlotWidth` (opt-in, on top of the indent grid): every list
   marker occupies an invisible fixed-width column at its depth indent — the
   painted bullet and ordered marker center horizontally in the column (ordered
@@ -26,14 +23,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   — and item content hangs `markerSlotWidth + markerTextGap` after the marker
   origin, so checkbox, bullet, and number items share one alignment grid.
   `nil` (the default) keeps the gap-only grid geometry exactly.
-- Ordered-marker lettering per depth: `ListStyle.orderedMarkerStyles` renders
-  nested ordered markers as letters or roman numerals (`[.numeric,
-  .lowerAlpha, .lowerRoman]` → `1.` / `a.` / `i.`, cycling below that). Only
-  the painted overlay changes — the source digits stay valid CommonMark. The
-  default (a single `.numeric`) keeps every level numeric as before.
-- `MarkdownEditorTheme.listMarker` colors the painted bullet `•` and ordered
-  markers independently of `bodyText` (`nil`, the default, keeps body ink).
->>>>>>> feature/list-marker-slot
+- `TaskCheckboxRenderer` service (`MarkdownEditorServices.taskCheckboxes`):
+  embedders can supply the image drawn for task-list checkboxes — for example
+  a design-system box — while the engine keeps ownership of the box's
+  geometry, invalidation, and click hit-testing. The default
+  `SystemTaskCheckboxRenderer` defers to the stock SF-symbol rendering, so
+  behavior is unchanged unless a renderer is injected.
+- Code-block CARD rendering (opt-in): `CodeBlockStyle.cornerRadius` draws a
+  fenced block as one continuous rounded card spanning the whole block —
+  wrapped lines included — instead of square per-paragraph fills, and
+  `CodeBlockStyle.cardVerticalPadding` pins the hidden fence lines' height so
+  they read as the card's interior padding (fences revert to their natural
+  height while the caret reveals them). Selection stays visible above the
+  card. `nil` (the default) keeps the historical rendering exactly.
+- Inline-code CHIP rendering (opt-in): `InlineCodeStyle.chipCornerRadius`
+  draws a small rounded background hugging each inline `code` span (per
+  wrapped line) with `chipHorizontalPadding` of breathing room, replacing the
+  square glyph-run fill. `MarkdownEditorTheme.inlineCodeBackground` colors the
+  chip (nil = `codeBackground`, then the syntax-highlighter background).
 - Opt-in list indent grid: `ListStyle.markerTextGap` puts list markers on a
   deterministic `depth × indentPerLevel` grid (level 1 aligned with the body
   origin, structural nesting depth so ordered lists step one level per
@@ -49,14 +56,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default (a single `.numeric`) keeps every level numeric as before.
 - `MarkdownEditorTheme.listMarker` colors the painted bullet `•` and ordered
   markers independently of `bodyText` (`nil`, the default, keeps body ink).
-=======
-- `TaskCheckboxRenderer` service (`MarkdownEditorServices.taskCheckboxes`):
-  embedders can supply the image drawn for task-list checkboxes — for example
-  a design-system box — while the engine keeps ownership of the box's
-  geometry, invalidation, and click hit-testing. The default
-  `SystemTaskCheckboxRenderer` defers to the stock SF-symbol rendering, so
-  behavior is unchanged unless a renderer is injected.
->>>>>>> feature/task-checkbox-renderer
 - Checked-task treatment knobs: `TaskCheckboxStyle.strikethroughCompletedTasks`
   gates the completed label's strikethrough (default on, as before),
   `MarkdownEditorTheme.completedTaskText` colors the completed label (nil =

@@ -260,17 +260,35 @@ public struct CodeBlockStyle: Sendable {
     public var paragraphSpacing: CGFloat
     /// Left/right indent (in points) so code blocks don't run into the gutter.
     public var horizontalIndent: CGFloat
+    /// Corner radius of the code-block CARD. Setting it opts the block into
+    /// card rendering: one continuous rounded background spanning the whole
+    /// fenced block (wrapped lines included), with the corners rounded on the
+    /// block's first and last lines only. `nil` (the default) keeps the
+    /// historical rendering — a square per-paragraph fill from the
+    /// `.backgroundColor` attribute.
+    public var cornerRadius: CGFloat?
+    /// Interior vertical padding of the card: the hidden fence lines' pinned
+    /// line height, i.e. the space between the card's edge and the first/last
+    /// code line. Only takes effect in card mode while the fences are hidden;
+    /// while the caret reveals the fences they keep their natural code line
+    /// height so editing them stays comfortable. `nil` (the default) keeps
+    /// the fences' natural height.
+    public var cardVerticalPadding: CGFloat?
 
     public init(
         fontName: String? = nil,
         fontSizeScale: CGFloat = 0.85,
         paragraphSpacing: CGFloat = 2.0,
-        horizontalIndent: CGFloat = 12.0
+        horizontalIndent: CGFloat = 12.0,
+        cornerRadius: CGFloat? = nil,
+        cardVerticalPadding: CGFloat? = nil
     ) {
         self.fontName = fontName
         self.fontSizeScale = fontSizeScale
         self.paragraphSpacing = paragraphSpacing
         self.horizontalIndent = horizontalIndent
+        self.cornerRadius = cornerRadius
+        self.cardVerticalPadding = cardVerticalPadding
     }
 
     public static let `default` = CodeBlockStyle()
@@ -287,10 +305,27 @@ public struct InlineCodeStyle: Sendable {
     /// the code-block font. A name that doesn't resolve degrades the same
     /// way.
     public var fontName: String?
+    /// Corner radius of the inline-code CHIP. Setting it opts inline `code`
+    /// spans into chip rendering: a small rounded background drawn behind the
+    /// span (per wrapped line) with `chipHorizontalPadding` of breathing room
+    /// on each side, hugging the code text's own height instead of the whole
+    /// line box. `nil` (the default) keeps the historical rendering — a
+    /// square glyph-run fill from the `.backgroundColor` attribute.
+    public var chipCornerRadius: CGFloat?
+    /// Horizontal padding (in points) the chip extends beyond the span's
+    /// first and last glyph. Only read in chip mode.
+    public var chipHorizontalPadding: CGFloat
 
-    public init(fontSizeScale: CGFloat = 0.85, fontName: String? = nil) {
+    public init(
+        fontSizeScale: CGFloat = 0.85,
+        fontName: String? = nil,
+        chipCornerRadius: CGFloat? = nil,
+        chipHorizontalPadding: CGFloat = 3.0
+    ) {
         self.fontSizeScale = fontSizeScale
         self.fontName = fontName
+        self.chipCornerRadius = chipCornerRadius
+        self.chipHorizontalPadding = chipHorizontalPadding
     }
 
     public static let `default` = InlineCodeStyle()

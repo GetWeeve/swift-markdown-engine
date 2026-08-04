@@ -33,6 +33,14 @@ extension NSAttributedString.Key {
     static let scrollableBlockTotalHeight = NSAttributedString.Key("ScrollableBlockTotalHeight")
     /// NSValue(range:) — full multi-line range of the wide-table source, used to scope width-change restyles.
     static let scrollableBlockFullRange = NSAttributedString.Key("ScrollableBlockFullRange")
+    /// NSValue(range:) — whole fenced-block range (fences included). Marks the
+    /// block as card-rendered (`CodeBlockStyle.cornerRadius` set); each
+    /// fragment uses the range to decide whether it draws the card's top
+    /// and/or bottom rounded corners.
+    static let codeBlockCard = NSAttributedString.Key("CodeBlockCard")
+    /// Marks an inline `code` span rendered as a rounded chip
+    /// (`InlineCodeStyle.chipCornerRadius` set). Set to `true`.
+    static let inlineCodeChip = NSAttributedString.Key("InlineCodeChip")
 }
 
 final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
@@ -54,7 +62,7 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
         var bounds = super.renderingSurfaceBounds
         // Task checkboxes too: the box draws left of the first glyph (marker
         // slot), outside the default text surface — TextKit would clip it.
-        if hasCodeBlockBackground || hasThematicBreak || hasBlockquote || hasTaskCheckbox {
+        if hasCodeBlockBackground || hasThematicBreak || hasBlockquote || hasTaskCheckbox || hasInlineCodeChip {
             let containerWidth = textLayoutManager?.textContainer?.size.width ?? bounds.width
             // Extend left to container edge
             bounds.origin.x = -layoutFragmentFrame.origin.x
@@ -73,6 +81,9 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
     override func draw(at point: CGPoint, in context: CGContext) {
         // 1. Code-block backgrounds (behind text)
         drawCodeBlockBackground(at: point, in: context)
+
+        // 1b. Inline-code chips (behind text; selection cut out like 1)
+        drawInlineCodeChips(at: point, in: context)
 
         // 2. LaTeX images (behind text — hidden markers are invisible anyway)
         drawLatexImages(at: point, in: context)
@@ -155,9 +166,22 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
 
     private var hasCodeBlockBackground: Bool {
         guard let ts = textStorage, let range = fragmentNSRange, range.length > 0 else { return false }
+        if ts.attribute(.codeBlockCard, at: range.location, effectiveRange: nil) != nil { return true }
         let bgColor = ts.attribute(.backgroundColor, at: range.location, effectiveRange: nil) as? NSColor
         guard let bgColor else { return false }
         return isCodeBlockBackgroundColor(bgColor)
+    }
+
+    private var hasInlineCodeChip: Bool {
+        guard let ts = textStorage, let range = fragmentNSRange, range.length > 0 else { return false }
+        var found = false
+        ts.enumerateAttribute(.inlineCodeChip, in: range, options: []) { value, _, stop in
+            if value as? Bool == true {
+                found = true
+                stop.pointee = true
+            }
+        }
+        return found
     }
 
     private var hasThematicBreak: Bool {
@@ -198,6 +222,14 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
 
     private func drawCodeBlockBackground(at point: CGPoint, in context: CGContext) {
         guard let ts = textStorage, let range = fragmentNSRange, range.length > 0 else { return }
+
+        // Card mode: the styler tags the block with `.codeBlockCard` instead
+        // of a `.backgroundColor`, and each fragment paints its slice of one
+        // continuous rounded card.
+        if let cardValue = ts.attribute(.codeBlockCard, at: range.location, effectiveRange: nil) as? NSValue {
+            drawCodeBlockCardSlice(blockRange: cardValue.rangeValue, at: point, in: context)
+            return
+        }
 
         // Only fenced code-block fragments get the full-width fill (first char must carry the code background).
         guard let color = ts.attribute(.backgroundColor, at: range.location, effectiveRange: nil) as? NSColor,
@@ -246,6 +278,161 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
             }
             path.fill()
         }
+    }
+
+    /// One fragment's slice of the code-block CARD: a full-width fill whose
+    /// corners round only on the fragments holding the block's first and last
+    /// characters, so the whole fenced block (wrapped lines included) reads
+    /// as ONE continuous rounded card. Rounding is achieved by extending the
+    /// rounded rect past the slice on the sides that must stay square and
+    /// clipping back to the slice — every fragment still draws strictly
+    /// inside its own strip, so invalidation and scrolling stay per-fragment.
+    private func drawCodeBlockCardSlice(blockRange: NSRange, at point: CGPoint, in context: CGContext) {
+        guard let range = fragmentNSRange else { return }
+        let configuration = (textLayoutManager?.textContainer?.textView as? NativeTextView)?
+            .configuration ?? .default
+        guard let radius = configuration.codeBlock.cornerRadius else { return }
+        let color = configuration.theme.codeBackground
+            ?? configuration.services.syntaxHighlighter.backgroundColor()
+
+        let containerWidth = textLayoutManager?.textContainer?.size.width ?? layoutFragmentFrame.width
+
+        var effectiveHeight = layoutFragmentFrame.height
+        if textLineFragments.count > 1,
+           let lastLF = textLineFragments.last,
+           lastLF.characterRange.length == 0 {
+            effectiveHeight -= lastLF.typographicBounds.height
+        }
+
+        let scale = textLayoutManager?.textContainer?.textView?.window?.backingScaleFactor
+            ?? NSScreen.main?.backingScaleFactor ?? 2.0
+        let snappedY = floor(point.y * scale) / scale
+        let snappedMaxY = ceil((point.y + effectiveHeight) * scale) / scale
+
+        let bgRect = CGRect(
+            x: point.x - layoutFragmentFrame.origin.x,
+            y: snappedY,
+            width: containerWidth,
+            height: snappedMaxY - snappedY
+        )
+
+        let isTop = NSLocationInRange(blockRange.location, range)
+        let isBottom = blockRange.length > 0 && NSLocationInRange(NSMaxRange(blockRange) - 1, range)
+        var cardRect = bgRect
+        if !isTop {
+            cardRect.origin.y -= radius
+            cardRect.size.height += radius
+        }
+        if !isBottom {
+            cardRect.size.height += radius
+        }
+
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
+
+        NSBezierPath(rect: bgRect).setClip()
+        let path = NSBezierPath(roundedRect: cardRect, xRadius: radius, yRadius: radius)
+        path.windingRule = .evenOdd
+        // Selection stays visible inside the card, same as the legacy fill.
+        for r in selectionRectsInDrawCoordinates(drawPoint: point, snappedY: snappedY, snappedMaxY: snappedMaxY) {
+            let cut = r.intersection(bgRect)
+            if !cut.isEmpty { path.appendRect(cut) }
+        }
+        color.setFill()
+        path.fill()
+    }
+
+    // MARK: - Inline Code Chips
+
+    /// Rounded chip behind each inline `code` span (`.inlineCodeChip`): a
+    /// small background hugging the code text's own height with a little
+    /// horizontal breathing room, drawn per wrapped line. Selection is cut
+    /// out even-odd so the system highlight stays visible above the chip.
+    private func drawInlineCodeChips(at point: CGPoint, in context: CGContext) {
+        guard let ts = textStorage, let range = fragmentNSRange, range.length > 0 else { return }
+        guard let textView = textLayoutManager?.textContainer?.textView as? NativeTextView else { return }
+        let configuration = textView.configuration
+        guard let radius = configuration.inlineCode.chipCornerRadius else { return }
+
+        var chipRects: [CGRect] = []
+        let pad = configuration.inlineCode.chipHorizontalPadding
+        ts.enumerateAttribute(.inlineCodeChip, in: range, options: []) { [weak self] value, attrRange, _ in
+            guard let self, (value as? Bool) == true else { return }
+            let font = (ts.attribute(.font, at: attrRange.location, effectiveRange: nil) as? NSFont)
+                ?? textView.baseFont
+            let ascent = max(0, font.ascender)
+            let descent = max(0, -font.descender)
+            for lineFragment in self.textLineFragments {
+                let lr = lineFragment.characterRange
+                let lineDocRange = NSRange(location: range.location + lr.location, length: lr.length)
+                let inter = NSIntersectionRange(lineDocRange, attrRange)
+                guard inter.length > 0 else { continue }
+                let tb = lineFragment.typographicBounds
+                let startPos = lineFragment.locationForCharacter(at: inter.location - range.location)
+                let endPos = lineFragment.locationForCharacter(at: NSMaxRange(inter) - range.location)
+                let x0 = point.x + tb.origin.x + startPos.x
+                let x1 = point.x + tb.origin.x + endPos.x
+                guard x1 > x0 else { continue }
+                let baselineY = point.y + tb.origin.y + startPos.y
+                chipRects.append(CGRect(
+                    x: x0 - pad,
+                    y: baselineY - ascent - 1,
+                    width: (x1 - x0) + pad * 2,
+                    height: ascent + descent + 2
+                ))
+            }
+        }
+        guard !chipRects.isEmpty else { return }
+
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: true)
+
+        let selectionRects = selectionSegmentRects(drawPoint: point)
+        let color = configuration.theme.inlineCodeBackground
+            ?? configuration.theme.codeBackground
+            ?? configuration.services.syntaxHighlighter.backgroundColor()
+        color.setFill()
+        let path = NSBezierPath()
+        path.windingRule = .evenOdd
+        for chip in chipRects {
+            path.appendRoundedRect(chip, xRadius: radius, yRadius: radius)
+            for r in selectionRects {
+                let cut = r.intersection(chip)
+                if !cut.isEmpty { path.appendRect(cut) }
+            }
+        }
+        path.fill()
+    }
+
+    /// Active text-selection segment rectangles intersecting this fragment,
+    /// in draw-relative coordinates, with their natural segment heights
+    /// (unlike `selectionRectsInDrawCoordinates`, which expands to a snapped
+    /// vertical span for the code-block fill's cut-out).
+    private func selectionSegmentRects(drawPoint: CGPoint) -> [CGRect] {
+        guard let tlm = textLayoutManager else { return [] }
+        var rects: [CGRect] = []
+        let dx = drawPoint.x - layoutFragmentFrame.origin.x
+        let dy = drawPoint.y - layoutFragmentFrame.origin.y
+        let myRange = self.rangeInElement
+
+        for selection in tlm.textSelections {
+            for textRange in selection.textRanges {
+                let interStart = textRange.location.compare(myRange.location) == .orderedAscending
+                    ? myRange.location : textRange.location
+                let interEnd = textRange.endLocation.compare(myRange.endLocation) == .orderedDescending
+                    ? myRange.endLocation : textRange.endLocation
+                guard interStart.compare(interEnd) == .orderedAscending,
+                      let intersection = NSTextRange(location: interStart, end: interEnd) else { continue }
+
+                tlm.enumerateTextSegments(in: intersection, type: .selection, options: []) { _, segFrame, _, _ in
+                    rects.append(segFrame.offsetBy(dx: dx, dy: dy))
+                    return true
+                }
+            }
+        }
+        return rects
     }
 
     /// Returns active text-selection rectangles intersecting this fragment, in

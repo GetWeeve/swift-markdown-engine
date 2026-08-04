@@ -130,6 +130,12 @@ public struct MarkdownEditorTheme: Sendable {
     /// syntax-highlighter service's background color.
     public var codeBackground: NSColor?
 
+    /// Background color of the inline-code CHIP
+    /// (``InlineCodeStyle/chipCornerRadius`` set). `nil` (the default) falls
+    /// back to ``codeBackground`` and then to the syntax-highlighter
+    /// service's background color.
+    public var inlineCodeBackground: NSColor?
+
     // MARK: Tables
 
     /// Fill behind a rendered table's header row. `nil` (the default) keeps
@@ -162,6 +168,7 @@ public struct MarkdownEditorTheme: Sendable {
         strikethroughColor: NSColor = .labelColor,
         highlightColor: NSColor = .systemOrange.withAlphaComponent(0.4),
         codeBackground: NSColor? = nil,
+        inlineCodeBackground: NSColor? = nil,
         tableHeaderBackground: NSColor? = nil,
         tableRule: NSColor? = nil
     ) {
@@ -185,6 +192,7 @@ public struct MarkdownEditorTheme: Sendable {
         self.strikethroughColor = strikethroughColor
         self.highlightColor = highlightColor
         self.codeBackground = codeBackground
+        self.inlineCodeBackground = inlineCodeBackground
         self.tableHeaderBackground = tableHeaderBackground
         self.tableRule = tableRule
     }
