@@ -107,6 +107,19 @@ struct ListMarkerStylingTests {
         #expect(overlayMarker(in: attrs, at: childMarker) == "a.")
     }
 
+    @Test("depth for the style is structural — a 3-column-per-level ordered ladder reaches roman on level 3")
+    func structuralDepthReachesRomanOnLevelThree() {
+        // CommonMark ordered nesting indents by the parent MARKER width (three
+        // columns), so the third level sits at six columns. A spaces/2 depth
+        // would read that as depth 3 and cycle back to numeric; the structural
+        // ladder reads depth 2 → roman.
+        let text = "1. one\n   1. two\n      1. three\n"
+        let attrs = style(text, styles: [.numeric, .lowerAlpha, .lowerRoman])
+        let ns = text as NSString
+        #expect(overlayMarker(in: attrs, at: ns.range(of: "1. two").location) == "a.")
+        #expect(overlayMarker(in: attrs, at: ns.range(of: "1. three").location) == "i.")
+    }
+
     @Test("lettering keeps the source punctuation — a paren list stays a paren list")
     func letteringKeepsParenPunctuation() {
         let text = "1) top\n   1) child\n"

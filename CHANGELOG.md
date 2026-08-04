@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default (a single `.numeric`) keeps every level numeric as before.
 - `MarkdownEditorTheme.listMarker` colors the painted bullet `•` and ordered
   markers independently of `bodyText` (`nil`, the default, keeps body ink).
+- Opt-in list indent grid: `ListStyle.markerTextGap` puts list markers on a
+  deterministic `depth × indentPerLevel` grid (level 1 aligned with the body
+  origin, structural nesting depth so ordered lists step one level per
+  parent), neutralizes the raw source whitespace as the visual indent, and
+  hangs content a fixed slot after the marker for every marker kind (bullet,
+  any digit count, task box — which left-aligns to the slot origin). Wrapped
+  lines hang at the content edge. `nil` (the default) keeps the historical
+  geometry exactly.
 - Custom heading typeface and color: `HeadingStyle.fontName` renders headings
   in a specific PostScript face (honored exactly, so the chosen weight is
   respected; an unresolvable name falls back to the stock bold base font),

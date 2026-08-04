@@ -71,7 +71,8 @@ enum MarkdownASTStyler {
             extensionsByID: configuration.extensionsByID,
             wikiLinkID: wikiLinkIDProvider,
             scopedRanges: scopedRanges,
-            orderedDisplayNumbers: computeOrderedDisplayNumbers(blocks: blocks, ns: ns)
+            orderedDisplayNumbers: computeOrderedDisplayNumbers(blocks: blocks, ns: ns),
+            listDepths: computeListDepths(blocks: blocks, ns: ns)
         )
         var attrs: [StyledRange] = []
         for block in blocks where ctx.inScope(block.range) {
@@ -209,12 +210,13 @@ enum MarkdownASTStyler {
     /// hole between two scoped blocks" without materializing the substring.
     private static let nonWhitespace = CharacterSet.whitespacesAndNewlines.inverted
 
-    /// Replays the ordered-list run that continues ABOVE `loc` (scanning backward
-    /// in the full source: same-indent items counted, blank lines skipped, real
-    /// content stops it) and returns the next number per indent. Lets a scoped
-    /// restyle that only sees a local window continue the document's numbering.
-    private static func seedOrderedCounters(above loc: Int, in ns: NSString) -> [Int: Int] {
-        guard loc > 0, loc <= ns.length else { return [:] }
+    /// The list-item lines of the run that continues ABOVE `loc`, bottom-to-top
+    /// (scanning backward in the full source: list lines collected, blank lines
+    /// skipped, real content stops the scan). `number` is nil for bullets/tasks.
+    /// Shared by the ordered-counter and indent-stack seeds so a scoped restyle
+    /// that only sees a local window can rebuild the document-level run state.
+    private static func scanListRunLines(above loc: Int, in ns: NSString) -> [(indent: Int, number: Int?)] {
+        guard loc > 0, loc <= ns.length else { return [] }
         var runLines: [(indent: Int, number: Int?)] = []   // bottom-to-top; nil = bullet/other list
         // From the START of loc's line: callers pass a MARKER offset, which for
         // an indented item still sits inside its own line — scanning up from
@@ -240,8 +242,16 @@ enum MarkdownASTStyler {
             runLines.append(((ws as NSString).length, number))
             scan = lineRange.location
         }
+        return runLines
+    }
+
+    /// Replays the ordered-list run that continues ABOVE `loc` (scanning backward
+    /// in the full source: same-indent items counted, blank lines skipped, real
+    /// content stops it) and returns the next number per indent. Lets a scoped
+    /// restyle that only sees a local window continue the document's numbering.
+    private static func seedOrderedCounters(above loc: Int, in ns: NSString) -> [Int: Int] {
         var counters: [Int: Int] = [:]
-        for item in runLines.reversed() {                    // replay top-to-bottom
+        for item in scanListRunLines(above: loc, in: ns).reversed() {   // replay top-to-bottom
             if let number = item.number {
                 counters[item.indent] = (counters[item.indent] ?? number) + 1
             } else {
@@ -250,6 +260,63 @@ enum MarkdownASTStyler {
             for key in counters.keys where key > item.indent { counters[key] = nil }
         }
         return counters
+    }
+
+    /// Replays the list run that continues ABOVE `loc` and returns the stack of
+    /// open ancestor indent columns (outermost first) — the state
+    /// `computeListDepths` needs to keep a nested item's depth stable when a
+    /// scoped restyle starts mid-list.
+    private static func seedIndentStack(above loc: Int, in ns: NSString) -> [Int] {
+        var stack: [Int] = []
+        for item in scanListRunLines(above: loc, in: ns).reversed() {   // replay top-to-bottom
+            while let top = stack.last, top >= item.indent { stack.removeLast() }
+            stack.append(item.indent)
+        }
+        return stack
+    }
+
+    /// Structural nesting depth (0-based) per list item, keyed by marker
+    /// location. Derived from the ORDER of indent columns in the run — an item
+    /// is one level deeper than the nearest earlier item with a smaller indent
+    /// — instead of a fixed spaces-per-level divisor, so ordered nesting (3+
+    /// columns per level, marker-width driven) and bullet nesting (2 columns)
+    /// land on the same ladder. Mirrors `computeOrderedDisplayNumbers`'
+    /// gap/seed handling so scoped restyles see document-level depth.
+    private static func computeListDepths(blocks: [BlockNode], ns: NSString) -> [Int: Int] {
+        var result: [Int: Int] = [:]
+        var stack: [Int] = []          // open ancestor indent columns
+        var needsSeed = true
+        var contiguousEnd: Int?
+        for block in blocks {
+            if let contiguousEnd, block.range.location > contiguousEnd,
+               ns.rangeOfCharacter(from: Self.nonWhitespace, options: [],
+                                   range: NSRange(location: contiguousEnd,
+                                                  length: block.range.location - contiguousEnd)).location != NSNotFound {
+                stack = []
+                needsSeed = true
+            }
+            contiguousEnd = NSMaxRange(block.range)
+            switch block {
+            case .list(_, let items):
+                for item in items {
+                    if needsSeed {
+                        stack = seedIndentStack(above: item.marker.location, in: ns)
+                        needsSeed = false
+                    }
+                    while let top = stack.last, top >= item.indent { stack.removeLast() }
+                    result[item.marker.location] = stack.count
+                    stack.append(item.indent)
+                }
+            case .blank:
+                break                     // blank lines keep the run (spacing, not a reset)
+            case .paragraph(_, let inlines) where inlines.isEmpty:
+                break                     // an empty paragraph line is spacing too
+            default:
+                stack = []                // real text/content ends the run
+                needsSeed = false         // a seed scan would stop on this line anyway
+            }
+        }
+        return result
     }
 
     private static func computeOrderedDisplayNumbers(blocks: [BlockNode], ns: NSString) -> [Int: Int] {
@@ -351,7 +418,10 @@ enum MarkdownASTStyler {
                                     length: item.contentRange.location - item.marker.location)
         // The per-depth marker style (1. / a. / i. — .numeric everywhere by
         // default). Only the painted overlay changes; the source stays digits.
-        let markerStyle = ctx.config.lists.orderedMarkerStyle(forDepth: MarkdownLists.indentLevel(from: ws))
+        // STRUCTURAL depth (indent-ladder position), so 3-column ordered
+        // nesting picks the next style per parent, not per two source columns.
+        let markerStyle = ctx.config.lists.orderedMarkerStyle(
+            forDepth: ctx.listDepths[item.marker.location] ?? MarkdownLists.indentLevel(from: ws))
         // Also off while the marker is inside a selection: the painter reveals the
         // raw source digits there, so the slot must revert to raw width (else a
         // kerned slot leaves a gap/overlap over the raw digits).
@@ -365,6 +435,10 @@ enum MarkdownASTStyler {
         // Keep the source punctuation (`.` or `)`) when overlaying, so a paren list stays a paren list.
         let orderedPunct = orderedOverlayActive && item.marker.length > 0
             ? ctx.ns.substring(with: NSRange(location: NSMaxRange(item.marker) - 1, length: 1)) : "."
+        // A hidden task in the indent grid collapses its `- ` too (the drawn box
+        // replaces the whole marker slot, LEFT-aligned at the slot origin), so
+        // the slot kern below must measure the marker at its collapsed advance.
+        let gridHiddenTask = ctx.config.lists.markerTextGap != nil && item.checkbox != nil && !taskRevealed
         // Via the memoized measure — list markers are a tiny repeated set (`- `, `1. `).
         let markerWidth: CGFloat = {
             if orderedOverlayActive, let displayNumber {
@@ -372,9 +446,16 @@ enum MarkdownASTStyler {
                                                          length: item.contentRange.location - NSMaxRange(item.marker)))
                 return HeadingHelpers.textWidth(markerStyle.label(for: displayNumber) + orderedPunct + gap, font: ctx.baseFont)
             }
-            return HeadingHelpers.textWidth(ctx.ns.substring(with: markerGroup), font: ctx.baseFont)
+            return HeadingHelpers.textWidth(ctx.ns.substring(with: markerGroup),
+                                            font: gridHiddenTask ? ctx.inlineMarkerFont : ctx.baseFont)
         }()
+        // Legacy layout derives depth from a fixed 2-columns-per-level divisor;
+        // the grid uses the STRUCTURAL depth (position of this item's indent in
+        // the run's indent ladder) so 3-column ordered nesting steps one level
+        // per parent, not one per two source columns.
         let depthIndent = CGFloat(MarkdownLists.indentLevel(from: ws)) * ctx.config.lists.indentPerLevel
+        let structuralDepth = ctx.listDepths[item.marker.location] ?? MarkdownLists.indentLevel(from: ws)
+        let gridDepthIndent = CGFloat(structuralDepth) * ctx.config.lists.indentPerLevel
         let ps = NSMutableParagraphStyle()
         let lineHeight = ctx.baseLineHeight + ctx.config.lists.extraLineHeight
         ps.minimumLineHeight = lineHeight
@@ -383,25 +464,69 @@ enum MarkdownASTStyler {
         ps.paragraphSpacing = ctx.baseParagraphSpacing
         ps.paragraphSpacingBefore = 0
         ps.tabStops = []
-        ps.defaultTabInterval = ctx.config.lists.indentPerLevel
-        ps.firstLineHeadIndent = ctx.config.lists.indentPerLevel
-        // Wrapped lines hang under the first line's content (indent + marker
-        // width). No checkbox-specific extra: the box is a drawn overlay that
-        // doesn't change text advance, so adding it here (and only here, not to
-        // firstLineHeadIndent) shifted an unchecked task's wrapped lines right
-        // of its first line.
-        ps.headIndent = ctx.config.lists.indentPerLevel + depthIndent + markerWidth
-        attrs.append((line, [.paragraphStyle: ps]))
+        if let gap = ctx.config.lists.markerTextGap,
+           item.contentRange.location - 1 >= NSMaxRange(item.marker) {
+            // Indent GRID (opt-in, see ListStyle.markerTextGap): the marker
+            // starts at depth × indentPerLevel — level 1 on the body origin —
+            // and content hangs a fixed slot after it. The raw source
+            // whitespace is neutralized below, so tabs must stop advancing to
+            // indentPerLevel stops; a sub-point interval reduces each tab to
+            // layout noise instead.
+            ps.defaultTabInterval = 0.25
+            ps.firstLineHeadIndent = gridDepthIndent
+            // The slot can widen freely but only narrow until the final spacer
+            // char would reach a negative advance (content folding back over
+            // the marker glyphs).
+            let spacerRange = NSRange(location: item.contentRange.location - 1, length: 1)
+            let spacerWidth = HeadingHelpers.textWidth(ctx.ns.substring(with: spacerRange), font: ctx.baseFont)
+            let slot = max(gap, markerWidth - spacerWidth + 0.5)
+            ps.headIndent = gridDepthIndent + slot
+            attrs.append((line, [.paragraphStyle: ps]))
+            // Collapse the leading whitespace so the SOURCE indent stops being
+            // the visual indent — the paragraph indent above owns it now.
+            // (Tabs keep their sub-point interval advance; spaces take the
+            // hidden-marker font like every other collapsed syntax char.)
+            if wsRange.length > 0 {
+                attrs.append((wsRange, [.font: ctx.inlineMarkerFont]))
+            }
+            // Land the content exactly on the slot edge by kerning the final
+            // spacer char. markerWidth already measures the DISPLAY marker
+            // while the ordered overlay is active and the raw marker in every
+            // reveal state, so the same correction holds for every marker kind
+            // — content doesn't jump when the caret enters/leaves the syntax.
+            attrs.append((spacerRange, [.kern: slot - markerWidth]))
+        } else {
+            ps.defaultTabInterval = ctx.config.lists.indentPerLevel
+            ps.firstLineHeadIndent = ctx.config.lists.indentPerLevel
+            // Wrapped lines hang under the first line's content (indent + marker
+            // width). No checkbox-specific extra: the box is a drawn overlay that
+            // doesn't change text advance, so adding it here (and only here, not to
+            // firstLineHeadIndent) shifted an unchecked task's wrapped lines right
+            // of its first line.
+            ps.headIndent = ctx.config.lists.indentPerLevel + depthIndent + markerWidth
+            attrs.append((line, [.paragraphStyle: ps]))
+        }
 
         // 2. Marker decoration (suppressed while the caret edits the syntax).
         if let box = item.checkbox {
             if taskRevealed { return }
             let spacer = NSRange(location: NSMaxRange(item.marker), length: box.location - NSMaxRange(item.marker))
-            // `- ` keeps full advance (the box's slot, like the bullet `•`);
-            // `[ ]` + trailing space collapse to the hidden-marker font so the
-            // content starts at the bullet-content x.
-            attrs.append((item.marker, [.foregroundColor: NSColor.clear]))
-            if spacer.length > 0 { attrs.append((spacer, [.foregroundColor: NSColor.clear])) }
+            if gridHiddenTask {
+                // Indent grid: the WHOLE `- [ ] ` collapses so the box range's
+                // position IS the marker-slot origin — the drawn square sits
+                // LEFT-aligned there (where a bullet glyph would start) and the
+                // slot kern above already measures the collapsed marker.
+                attrs.append((item.marker, [.foregroundColor: NSColor.clear, .font: ctx.inlineMarkerFont]))
+                if spacer.length > 0 {
+                    attrs.append((spacer, [.foregroundColor: NSColor.clear, .font: ctx.inlineMarkerFont]))
+                }
+            } else {
+                // `- ` keeps full advance (the box's slot, like the bullet `•`);
+                // `[ ]` + trailing space collapse to the hidden-marker font so the
+                // content starts at the bullet-content x.
+                attrs.append((item.marker, [.foregroundColor: NSColor.clear]))
+                if spacer.length > 0 { attrs.append((spacer, [.foregroundColor: NSColor.clear])) }
+            }
             attrs.append((box, [.taskCheckbox: item.checked, .foregroundColor: NSColor.clear,
                                 .font: ctx.inlineMarkerFont]))
             let postGap = NSRange(location: NSMaxRange(box),
@@ -519,6 +644,9 @@ enum MarkdownASTStyler {
         let wikiLinkID: (NSRange) -> String?
         let scopedRanges: [NSRange]?
         let orderedDisplayNumbers: [Int: Int]
+        /// Structural nesting depth (0-based) per list item, keyed by marker
+        /// location — see `computeListDepths`.
+        let listDepths: [Int: Int]
 
         /// True when a non-empty selection overlaps `range` — the selection
         /// counterpart of `isActive` for elements that reveal on select.
