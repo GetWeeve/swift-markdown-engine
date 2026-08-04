@@ -54,6 +54,12 @@ final class NativeTextView: NSTextView {
     weak var observedCaretIndicator: NSView?
     var isApplyingCaretShift: Bool = false
 
+    // MARK: Cursor-tracking state
+    /// Keeps hover cursors (checkbox hand, read-only link hand) alive while
+    /// the window isn't key; installed by `updateTrackingAreas` in
+    /// `NativeTextView+CursorRects.swift`.
+    var inactiveWindowCursorTrackingArea: NSTrackingArea?
+
     // MARK: Drag-select state
     var dragStartMouseScreenLoc: NSPoint?
 

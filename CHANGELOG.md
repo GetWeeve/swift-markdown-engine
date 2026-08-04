@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The drawn task checkbox now shows the pointing-hand cursor on hover in
+  edit mode (it toggles on click, so it reads as a button, like links) —
+  previously the plain arrow. An app-active tracking area also keeps hover
+  cursors (the checkbox hand, the read-only link hand) responsive while
+  the editor's window isn't key.
+
 ### Added
 - Custom heading typeface and color: `HeadingStyle.fontName` renders headings
   in a specific PostScript face (honored exactly, so the chosen weight is
