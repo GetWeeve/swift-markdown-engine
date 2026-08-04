@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (link ink + underline + pointing hand), so custom palettes color links as
   configured; the default theme renders exactly as before.
 
+### Changed
+- The drawn task checkbox now shows the pointing-hand cursor on hover in
+  edit mode (it toggles on click, so it reads as a button, like links) —
+  previously the plain arrow. An app-active tracking area also keeps hover
+  cursors (the checkbox hand, the read-only link hand) responsive while
+  the editor's window isn't key.
+
 ### Added
 - `ListStyle.markerSlotWidth` (opt-in, on top of the indent grid): every list
   marker occupies an invisible fixed-width column at its depth indent — the

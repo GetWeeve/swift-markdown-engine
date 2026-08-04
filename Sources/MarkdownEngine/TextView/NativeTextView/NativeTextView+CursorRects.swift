@@ -19,10 +19,11 @@ extension NativeTextView {
             // any set here fights the overlay's cursor (flicker).
             if isEditable { NSCursor.arrow.set() }
         } else if isEditable, isOverTaskCheckboxBox(event) {
-            // The box is a clickable control, not text. super sets the I-beam
-            // on every move, so setting the arrow after it flickers — skip
-            // super entirely, like the exclusion-zone branch.
-            NSCursor.arrow.set()
+            // The box is a clickable control, not text — a click toggles it,
+            // so it reads as a button: pointing hand, like links. super sets
+            // the I-beam on every move, so setting a cursor after it flickers
+            // — skip super entirely, like the exclusion-zone branch.
+            NSCursor.pointingHand.set()
         } else if isEditable, isOverWideTableOverlay(event) {
             // Same treatment for wide-table scroll overlays: the overlay is a
             // control surface (rendered image + horizontal scroller), not
@@ -40,7 +41,7 @@ extension NativeTextView {
         if isInCursorExclusionZone(event) {
             if isEditable { NSCursor.arrow.set() }
         } else if isEditable, isOverTaskCheckboxBox(event) {
-            NSCursor.arrow.set()
+            NSCursor.pointingHand.set()
         } else if isEditable, isOverWideTableOverlay(event) {
             NSCursor.arrow.set()
         } else {
@@ -48,6 +49,27 @@ extension NativeTextView {
             applyReadOnlyCursor(for: event)
             applyInvertedIBeamIfNeeded(for: event)
         }
+    }
+
+    /// NSTextView's own cursor tracking goes quiet while the window isn't
+    /// key, so the checkbox hand (and the read-only link hand) froze on
+    /// whatever cursor was last set when hovering an inactive editor panel.
+    /// One extra `.activeInActiveApp` area keeps `mouseMoved`/`mouseEntered`
+    /// flowing app-wide; the handlers above are idempotent, so overlapping
+    /// with the system areas while the window IS key is harmless.
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let area = inactiveWindowCursorTrackingArea {
+            removeTrackingArea(area)
+        }
+        let area = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseMoved, .mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        inactiveWindowCursorTrackingArea = area
     }
 
     /// True when the pointer is over a wide-table overlay's HORIZONTAL
