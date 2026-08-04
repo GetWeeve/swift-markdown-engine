@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The theme's `link` color now reaches the screen. `NSTextView` layers its
+  `linkTextAttributes` over every `.link` range at display time, and AppKit's
+  default paints them `.linkColor` blue — silently overriding the foreground
+  the styler set. The editor now derives `linkTextAttributes` from the theme
+  (link ink + underline + pointing hand), so custom palettes color links as
+  configured; the default theme renders exactly as before.
+
 ### Added
 - Custom heading typeface and color: `HeadingStyle.fontName` renders headings
   in a specific PostScript face (honored exactly, so the chosen weight is

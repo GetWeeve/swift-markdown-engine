@@ -126,3 +126,22 @@ public struct MarkdownEditorTheme: Sendable {
     /// `NSTextView`. It's also the default when no theme is supplied.
     public static let `default` = MarkdownEditorTheme()
 }
+
+// MARK: - Display attributes
+
+extension MarkdownEditorTheme {
+    /// Attributes for `NSTextView.linkTextAttributes`, which AppKit layers
+    /// over every `.link` range at DISPLAY time — on top of whatever
+    /// foreground the styler already set. Left at AppKit's default, links
+    /// always render `.linkColor` blue, so a custom ``link`` ink never
+    /// reaches the screen. Re-declaring the theme's link ink (plus the
+    /// standard underline and pointing-hand cursor the default also carries)
+    /// makes the displayed color follow the theme.
+    var linkTextAttributes: [NSAttributedString.Key: Any] {
+        [
+            .foregroundColor: link,
+            .underlineStyle: NSUnderlineStyle.single.rawValue,
+            .cursor: NSCursor.pointingHand,
+        ]
+    }
+}
