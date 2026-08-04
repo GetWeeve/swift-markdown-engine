@@ -31,7 +31,10 @@ extension NativeTextView {
             guard let isChecked = value as? Bool else { return }
             let anchor = bridge.boundingRect(forCharacterRange: attrRange, in: textContainer)
             let rect = CGRect(
-                x: TaskCheckboxGeometry.boxX(contentX: anchor.minX, size: boxSize),
+                x: TaskCheckboxGeometry.boxX(
+                    contentX: anchor.minX, size: boxSize,
+                    markerTextGap: configuration.lists.markerTextGap
+                ),
                 y: anchor.minY,
                 width: boxSize,
                 height: max(anchor.height, boxSize)
