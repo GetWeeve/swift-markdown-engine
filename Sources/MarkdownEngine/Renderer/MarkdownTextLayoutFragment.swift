@@ -624,10 +624,14 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
             // char's font (0.1pt in a heading-first doc → 1px boxes).
             let font = (textLayoutManager?.textContainer?.textView as? NativeTextView)?.baseFont
                 ?? NSFont.systemFont(ofSize: NSFont.systemFontSize)
+            let configuration = (textLayoutManager?.textContainer?.textView as? NativeTextView)?.configuration
+                ?? .default
             let ascent = max(0, font.ascender)
             let descent = max(0, -font.descender)
             let size = TaskCheckboxGeometry.size(for: font)
-            let boxX = TaskCheckboxGeometry.boxX(contentX: pos.x, size: size)
+            let boxX = TaskCheckboxGeometry.boxX(
+                contentX: pos.x, size: size, markerTextGap: configuration.lists.markerTextGap
+            )
             let centerY = pos.baselineY + (descent - ascent) / 2
             let boxY = centerY - size / 2
 
@@ -641,8 +645,6 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
 
             let iconInset = max(0.0, size * 0.01)
             let iconRect = boxRect.insetBy(dx: iconInset, dy: iconInset)
-            let configuration = (textLayoutManager?.textContainer?.textView as? NativeTextView)?.configuration
-                ?? .default
             let style = configuration.taskCheckbox
             let symbolName = isChecked ? style.checkedSymbolName : style.uncheckedSymbolName
             let fallbackName = isChecked

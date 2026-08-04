@@ -299,19 +299,48 @@ public struct ListStyle: Sendable {
     public var maximumNestingLevel: Int
     /// Extra line height added on top of the default to give list items room.
     public var extraLineHeight: CGFloat
+    /// Width (in points) of the marker slot — from the marker glyph's left
+    /// edge to the item content's left edge. Setting it opts the list layout
+    /// into a fixed indent GRID; `nil` (the default) keeps the historical
+    /// geometry exactly.
+    ///
+    /// Historically the visual indent is the raw source whitespace: every
+    /// first line starts at a flat `indentPerLevel`, nesting shows only as
+    /// the advance of the leading spaces/tabs (≈8pt for two spaces — far off
+    /// any design grid), and the marker→content gap is whatever `- ` happens
+    /// to measure.
+    ///
+    /// With a gap set, geometry becomes deterministic:
+    /// - a level-`n` item's marker starts at `n × indentPerLevel` from the
+    ///   text origin (level 1 aligns with body text),
+    /// - the leading source whitespace collapses (hidden-marker font; tabs
+    ///   advance by a sub-point interval) so it no longer shifts the line,
+    /// - content starts `markerTextGap` after the marker for every marker
+    ///   kind (bullet, any digit count, task box), via a kern on the final
+    ///   spacer character — so wrapped lines and the caret keep working on
+    ///   real text advances,
+    /// - wrapped lines hang at the content edge (`depth × indentPerLevel +
+    ///   markerTextGap`).
+    ///
+    /// A slot narrower than the marker itself widens just enough to keep the
+    /// spacer's advance positive. Note that in grid mode literal tabs inside
+    /// item CONTENT also advance by the sub-point interval.
+    public var markerTextGap: CGFloat?
 
     public init(
         helpersEnabled: Bool = true,
         autoClosePairsEnabled: Bool = true,
         indentPerLevel: CGFloat = 27.5,
         maximumNestingLevel: Int = 3,
-        extraLineHeight: CGFloat = 2
+        extraLineHeight: CGFloat = 2,
+        markerTextGap: CGFloat? = nil
     ) {
         self.helpersEnabled = helpersEnabled
         self.autoClosePairsEnabled = autoClosePairsEnabled
         self.indentPerLevel = indentPerLevel
         self.maximumNestingLevel = maximumNestingLevel
         self.extraLineHeight = extraLineHeight
+        self.markerTextGap = markerTextGap
     }
 
     public static let `default` = ListStyle()

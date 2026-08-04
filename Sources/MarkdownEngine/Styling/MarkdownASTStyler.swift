@@ -377,15 +377,48 @@ enum MarkdownASTStyler {
         ps.paragraphSpacing = ctx.baseParagraphSpacing
         ps.paragraphSpacingBefore = 0
         ps.tabStops = []
-        ps.defaultTabInterval = ctx.config.lists.indentPerLevel
-        ps.firstLineHeadIndent = ctx.config.lists.indentPerLevel
-        // Wrapped lines hang under the first line's content (indent + marker
-        // width). No checkbox-specific extra: the box is a drawn overlay that
-        // doesn't change text advance, so adding it here (and only here, not to
-        // firstLineHeadIndent) shifted an unchecked task's wrapped lines right
-        // of its first line.
-        ps.headIndent = ctx.config.lists.indentPerLevel + depthIndent + markerWidth
-        attrs.append((line, [.paragraphStyle: ps]))
+        if let gap = ctx.config.lists.markerTextGap,
+           item.contentRange.location - 1 >= NSMaxRange(item.marker) {
+            // Indent GRID (opt-in, see ListStyle.markerTextGap): the marker
+            // starts at depth × indentPerLevel — level 1 on the body origin —
+            // and content hangs a fixed slot after it. The raw source
+            // whitespace is neutralized below, so tabs must stop advancing to
+            // indentPerLevel stops; a sub-point interval reduces each tab to
+            // layout noise instead.
+            ps.defaultTabInterval = 0.25
+            ps.firstLineHeadIndent = depthIndent
+            // The slot can widen freely but only narrow until the final spacer
+            // char would reach a negative advance (content folding back over
+            // the marker glyphs).
+            let spacerRange = NSRange(location: item.contentRange.location - 1, length: 1)
+            let spacerWidth = HeadingHelpers.textWidth(ctx.ns.substring(with: spacerRange), font: ctx.baseFont)
+            let slot = max(gap, markerWidth - spacerWidth + 0.5)
+            ps.headIndent = depthIndent + slot
+            attrs.append((line, [.paragraphStyle: ps]))
+            // Collapse the leading whitespace so the SOURCE indent stops being
+            // the visual indent — the paragraph indent above owns it now.
+            // (Tabs keep their sub-point interval advance; spaces take the
+            // hidden-marker font like every other collapsed syntax char.)
+            if wsRange.length > 0 {
+                attrs.append((wsRange, [.font: ctx.inlineMarkerFont]))
+            }
+            // Land the content exactly on the slot edge by kerning the final
+            // spacer char. markerWidth already measures the DISPLAY marker
+            // while the ordered overlay is active and the raw marker in every
+            // reveal state, so the same correction holds for every marker kind
+            // — content doesn't jump when the caret enters/leaves the syntax.
+            attrs.append((spacerRange, [.kern: slot - markerWidth]))
+        } else {
+            ps.defaultTabInterval = ctx.config.lists.indentPerLevel
+            ps.firstLineHeadIndent = ctx.config.lists.indentPerLevel
+            // Wrapped lines hang under the first line's content (indent + marker
+            // width). No checkbox-specific extra: the box is a drawn overlay that
+            // doesn't change text advance, so adding it here (and only here, not to
+            // firstLineHeadIndent) shifted an unchecked task's wrapped lines right
+            // of its first line.
+            ps.headIndent = ctx.config.lists.indentPerLevel + depthIndent + markerWidth
+            attrs.append((line, [.paragraphStyle: ps]))
+        }
 
         // 2. Marker decoration (suppressed while the caret edits the syntax).
         if let box = item.checkbox {
