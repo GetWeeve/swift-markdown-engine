@@ -319,11 +319,15 @@ extension NativeTextView {
             propagateCaretRevealToEnclosingScroller(range: range)
             return
         }
-        // Only the reading column needs manual reveal; default keeps AppKit's native implementation.
-        guard configuration.readingWidth != nil else {
-            super.scrollRangeToVisible(range)
-            return
-        }
+        // Manual reveal for EVERY .scrolls editor, not only the reading
+        // column: AppKit's native scrollRangeToVisible is unreliable for
+        // off-screen content in a TextKit 2 text view (it routes through the
+        // absent TextKit 1 layout manager — see the find-reveal path, which
+        // learned this first), so typing at the bottom of a small viewport
+        // simply never scrolled. The fragment math below already serves both
+        // layouts: with no reading column the text view fills the container
+        // and `frame.origin.y` is just the header-band offset.
+        //
         // Explicit reveal: native scrollRangeToVisible can't position the container's centered subview.
         // A caret at the document end has no fragment at its location; step back one
         // char there so the last line's fragment is found (else nothing reveals).
@@ -390,9 +394,30 @@ extension NativeTextView {
             } else {
                 return false   // already visible (or a spurious verdict, corrected)
             }
-            cv.scroll(to: NSPoint(x: cv.bounds.origin.x, y: targetY))
-            scrollView.reflectScrolledClipView(cv)
-            (scrollView as? ClampedScrollView)?.clampToInsets()
+            // Clamp the target BEFORE moving so an animated reveal can't fly
+            // past the content and get yanked back by a post-hoc clamp.
+            let container = scrollView.documentView as? NativeTextViewContainer
+            let realHeight = container?.scrollableContentHeight ?? scrollView.documentView?.bounds.height ?? 0
+            let minY = -scrollView.contentInsets.top
+            let maxY = max(minY, realHeight - cv.bounds.height)
+            let clampedTarget = NSPoint(x: cv.bounds.origin.x, y: min(max(targetY, minY), maxY))
+            let duration = self.configuration.caretFollowAnimationDuration
+            if duration > 0, self.window != nil {
+                // Smooth-but-quick caret follow. Interrupting a running
+                // animation with a new animator target is safe: AppKit
+                // retargets from the current presentation value.
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = duration
+                    context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                    context.allowsImplicitAnimation = true
+                    cv.animator().setBoundsOrigin(clampedTarget)
+                }
+                scrollView.reflectScrolledClipView(cv)
+            } else {
+                cv.scroll(to: clampedTarget)
+                scrollView.reflectScrolledClipView(cv)
+                (scrollView as? ClampedScrollView)?.clampToInsets()
+            }
             return false
         }
     }

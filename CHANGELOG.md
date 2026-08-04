@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Caret-follow in `.scrolls` mode now works for every editor, not only the
+  reading column. AppKit's native `scrollRangeToVisible` routes through the
+  absent TextKit 1 layout manager in a TextKit 2 text view and silently
+  no-ops for off-screen content, so typing at the bottom of a small viewport
+  never scrolled the caret into view. The manual TextKit-2 fragment reveal
+  (previously gated on `readingWidth`) now serves all `.scrolls` editors,
+  with the reveal target clamped to the scrollable content before moving.
 - Interior table rules stroke in the themed rule color again. The rounded
   wrapper change moved the outer border's `setStroke` below the separator
   pass, which left interior rules on the drawing context's default black
@@ -35,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the editor's window isn't key.
 
 ### Added
+- `MarkdownEditorConfiguration.caretFollowAnimationDuration` (default `0` =
+  the historical instant jump): a short ease-out animation for the
+  caret-follow scroll in `.scrolls` mode, with no bounce. Ignored in
+  `.fitsContent`, where the enclosing page scroller owns the reveal.
 - `TableStyle.verticalRules` (default `true`) controls interior column
   separators in rendered tables. When `false`, only the outer border and the
   horizontal rules between rows (including the header/body rule) draw, with
