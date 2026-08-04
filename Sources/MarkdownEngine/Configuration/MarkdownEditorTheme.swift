@@ -47,6 +47,23 @@ public struct MarkdownEditorTheme: Sendable {
     public var headingText: NSColor?
     /// Foreground color for heading marker glyphs (`#`, `##`, …).
     public var headingMarker: NSColor
+    /// Foreground color for a CHECKED task item's label. `nil` (the default)
+    /// keeps the historical behavior: the label stays on the document's body
+    /// ink. Inline constructs inside the label (links, code, extension
+    /// spans) keep their own colors either way, exactly as they do over
+    /// ``bodyText``. Pairs with
+    /// ``TaskCheckboxStyle/strikethroughCompletedTasks`` for designs that
+    /// mark completion by ink instead of a strikethrough.
+    public var completedTaskText: NSColor?
+
+    // MARK: Task checkboxes
+
+    /// Tint of the drawn checkbox symbol for a CHECKED task item. `nil`
+    /// (the default) keeps the historical ``bodyText`` tint.
+    public var taskCheckboxChecked: NSColor?
+    /// Tint of the drawn checkbox symbol for an UNCHECKED task item. `nil`
+    /// (the default) keeps the historical ``mutedText`` tint.
+    public var taskCheckboxUnchecked: NSColor?
 
     // MARK: Links
 
@@ -96,6 +113,9 @@ public struct MarkdownEditorTheme: Sendable {
         disabledText: NSColor = .tertiaryLabelColor,
         headingText: NSColor? = nil,
         headingMarker: NSColor = .gray,
+        completedTaskText: NSColor? = nil,
+        taskCheckboxChecked: NSColor? = nil,
+        taskCheckboxUnchecked: NSColor? = nil,
         link: NSColor = .linkColor,
         incompleteLink: NSColor = .systemBlue,
         findMatchHighlight: NSColor = .systemYellow,
@@ -110,6 +130,9 @@ public struct MarkdownEditorTheme: Sendable {
         self.disabledText = disabledText
         self.headingText = headingText
         self.headingMarker = headingMarker
+        self.completedTaskText = completedTaskText
+        self.taskCheckboxChecked = taskCheckboxChecked
+        self.taskCheckboxUnchecked = taskCheckboxUnchecked
         self.link = link
         self.incompleteLink = incompleteLink
         self.findMatchHighlight = findMatchHighlight

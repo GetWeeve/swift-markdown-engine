@@ -404,10 +404,20 @@ enum MarkdownASTStyler {
                 attrs.append((postGap, [.foregroundColor: NSColor.clear, .font: ctx.inlineMarkerFont]))
             }
             if item.checked, NSMaxRange(item.range) > NSMaxRange(box) {
-                attrs.append((NSRange(location: NSMaxRange(box), length: NSMaxRange(item.range) - NSMaxRange(box)), [
-                    .strikethroughStyle: NSUnderlineStyle.single.rawValue,
-                    .strikethroughColor: ctx.theme.strikethroughColor,
-                ]))
+                let label = NSRange(location: NSMaxRange(box), length: NSMaxRange(item.range) - NSMaxRange(box))
+                // theme.completedTaskText paints the whole label; inline
+                // constructs (links, code, extension spans) append LATER via
+                // styleInlines, so they keep their own ink — the same
+                // later-range-wins layering the bodyText default relies on.
+                if let completedInk = ctx.theme.completedTaskText {
+                    attrs.append((label, [.foregroundColor: completedInk]))
+                }
+                if ctx.config.taskCheckbox.strikethroughCompletedTasks {
+                    attrs.append((label, [
+                        .strikethroughStyle: NSUnderlineStyle.single.rawValue,
+                        .strikethroughColor: ctx.theme.strikethroughColor,
+                    ]))
+                }
             }
         } else if !item.ordered {
             let syntax = NSRange(location: item.marker.location,
