@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Opt-in list indent grid: `ListStyle.markerTextGap` puts list markers on a
   deterministic `depth × indentPerLevel` grid (level 1 aligned with the body
-  origin), neutralizes the raw source whitespace as the visual indent, and
+  origin, structural nesting depth so ordered lists step one level per
+  parent), neutralizes the raw source whitespace as the visual indent, and
   hangs content a fixed slot after the marker for every marker kind (bullet,
   any digit count, task box — which left-aligns to the slot origin). Wrapped
   lines hang at the content edge. `nil` (the default) keeps the historical

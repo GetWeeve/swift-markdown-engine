@@ -143,13 +143,42 @@ struct ListIndentGridTests {
         #expect(abs((k ?? 0) - (36 - markerWidth)) < 0.01)
     }
 
-    @Test("task items keep the grid geometry")
+    @Test("task items keep the grid geometry and collapse the whole `- [ ] ` marker")
     func taskItemsKeepGridGeometry() {
         let text = "- [ ] task content\n"
         let attrs = style(text, gridConfig())
         let ps = paragraphStyle(in: attrs, at: 0)
         #expect(ps?.firstLineHeadIndent == 0)
         #expect(ps?.headIndent == 36)
+
+        // The `- ` collapses too (the drawn box owns the slot, left-aligned at
+        // its origin), so the slot kern measures the collapsed marker and the
+        // content still lands on the slot edge.
+        let hidden = MarkdownEditorConfiguration.default.markers.hiddenMarkerFontSize
+        #expect(font(in: attrs, at: 0)?.pointSize == hidden)   // "-"
+        #expect(font(in: attrs, at: 1)?.pointSize == hidden)   // " "
+        let collapsedFont = font(in: attrs, at: 0) ?? baseFont
+        let collapsedWidth = HeadingHelpers.textWidth("- ", font: collapsedFont)
+        let k = kern(in: attrs, at: 5)   // the space between "]" and "task"
+        #expect(k != nil)
+        #expect(abs((k ?? 0) - (36 - collapsedWidth)) < 0.01)
+    }
+
+    @Test("ordered nesting steps one level per parent, not one per two source columns")
+    func orderedNestingUsesStructuralDepth() {
+        // CommonMark ordered nesting indents by the parent MARKER width — three
+        // columns here. The naive spaces/2 divisor would put "three" on level 3
+        // (72pt); the structural ladder keeps it on level 2 (48pt).
+        let text = "1. one\n   1. two\n      1. three\n"
+        let attrs = style(text, gridConfig())
+        let ns = text as NSString
+
+        let two = paragraphStyle(in: attrs, at: ns.range(of: "1. two").location)
+        #expect(two?.firstLineHeadIndent == 24)
+
+        let three = paragraphStyle(in: attrs, at: ns.range(of: "1. three").location)
+        #expect(three?.firstLineHeadIndent == 48)
+        #expect(abs((three?.headIndent ?? 0) - (48 + 36)) < 0.01)
     }
 
     @Test("a slot narrower than the marker widens just enough to keep the spacer advance positive")
@@ -169,14 +198,11 @@ struct ListIndentGridTests {
 
     @Test("the drawn checkbox left-aligns to the marker slot in grid mode and right-aligns otherwise")
     func checkboxAlignmentPerMode() {
-        // Legacy: right-aligned to the content edge with the fixed gap.
+        // Legacy: the hidden `[ ] ` sits at the content edge (the `- ` keeps
+        // full advance), so the square right-aligns to it with the fixed gap.
         #expect(TaskCheckboxGeometry.boxX(contentX: 100, size: 17) == 100 - 17 - TaskCheckboxGeometry.gap)
-        // Grid: left-aligned to the slot origin.
-        #expect(TaskCheckboxGeometry.boxX(contentX: 100, size: 17, markerTextGap: 36) == 64)
-        // A slot narrower than the box falls back to the right-aligned position.
-        #expect(
-            TaskCheckboxGeometry.boxX(contentX: 100, size: 17, markerTextGap: 10)
-                == 100 - 17 - TaskCheckboxGeometry.gap
-        )
+        // Grid: the whole `- [ ] ` collapses, so the box range's own position
+        // IS the marker-slot origin — the square draws right there.
+        #expect(TaskCheckboxGeometry.boxX(contentX: 24, size: 17, markerTextGap: 36) == 24)
     }
 }

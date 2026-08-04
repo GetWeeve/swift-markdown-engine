@@ -30,14 +30,17 @@ enum TaskCheckboxGeometry {
 
     /// Left edge of the square.
     ///
-    /// Legacy layout right-aligns the box to the content start x with `gap`.
-    /// In the indent grid (``ListStyle/markerTextGap`` set) the box is
-    /// LEFT-aligned to the marker slot's origin instead, matching where a
-    /// bullet or number would start — clamped so a slot narrower than the
-    /// box itself falls back to the right-aligned position.
+    /// Legacy layout right-aligns the box to the content start x with `gap`
+    /// (the hidden `[ ] ` sits at the content edge because `- ` keeps full
+    /// advance). In the indent grid (``ListStyle/markerTextGap`` set) the
+    /// styler collapses the WHOLE `- [ ] `, so the box range's own position is
+    /// the marker-slot origin — the square is LEFT-aligned there, matching
+    /// where a bullet or number glyph would start. Gaps narrower than
+    /// `size + gap` let the square run into the content; configure
+    /// ``ListStyle/markerTextGap`` at least that wide.
     static func boxX(contentX: CGFloat, size: CGFloat, markerTextGap: CGFloat? = nil) -> CGFloat {
-        if let markerTextGap {
-            return contentX - max(markerTextGap, size + gap)
+        if markerTextGap != nil {
+            return contentX
         }
         return contentX - size - gap
     }
