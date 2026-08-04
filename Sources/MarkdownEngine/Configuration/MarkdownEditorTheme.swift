@@ -88,6 +88,15 @@ public struct MarkdownEditorTheme: Sendable {
     /// Background color used for `==highlight==` inline markup.
     public var highlightColor: NSColor
 
+    // MARK: Tables
+
+    /// Fill behind a rendered table's header row. `nil` (the default) keeps
+    /// the historical ``mutedText`` at 8% alpha.
+    public var tableHeaderBackground: NSColor?
+    /// Stroke color of a rendered table's outer border and internal rules.
+    /// `nil` (the default) keeps the historical ``mutedText`` at 50% alpha.
+    public var tableRule: NSColor?
+
     // MARK: Init
 
     public init(
@@ -103,7 +112,9 @@ public struct MarkdownEditorTheme: Sendable {
         latexLightModeText: NSColor = .black,
         latexDarkModeText: NSColor = .white,
         strikethroughColor: NSColor = .labelColor,
-        highlightColor: NSColor = .systemOrange.withAlphaComponent(0.4)
+        highlightColor: NSColor = .systemOrange.withAlphaComponent(0.4),
+        tableHeaderBackground: NSColor? = nil,
+        tableRule: NSColor? = nil
     ) {
         self.bodyText = bodyText
         self.mutedText = mutedText
@@ -118,6 +129,8 @@ public struct MarkdownEditorTheme: Sendable {
         self.latexDarkModeText = latexDarkModeText
         self.strikethroughColor = strikethroughColor
         self.highlightColor = highlightColor
+        self.tableHeaderBackground = tableHeaderBackground
+        self.tableRule = tableRule
     }
 
     /// System-native palette built from `NSColor` dynamic system colors.
