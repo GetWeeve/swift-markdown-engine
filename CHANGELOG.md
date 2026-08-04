@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   configured; the default theme renders exactly as before.
 
 ### Added
+<<<<<<< HEAD
 - Opt-in list indent grid: `ListStyle.markerTextGap` puts list markers on a
   deterministic `depth × indentPerLevel` grid (level 1 aligned with the body
   origin, structural nesting depth so ordered lists step one level per
@@ -31,6 +32,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default (a single `.numeric`) keeps every level numeric as before.
 - `MarkdownEditorTheme.listMarker` colors the painted bullet `•` and ordered
   markers independently of `bodyText` (`nil`, the default, keeps body ink).
+=======
+- `TaskCheckboxRenderer` service (`MarkdownEditorServices.taskCheckboxes`):
+  embedders can supply the image drawn for task-list checkboxes — for example
+  a design-system box — while the engine keeps ownership of the box's
+  geometry, invalidation, and click hit-testing. The default
+  `SystemTaskCheckboxRenderer` defers to the stock SF-symbol rendering, so
+  behavior is unchanged unless a renderer is injected.
+>>>>>>> feature/task-checkbox-renderer
 - Checked-task treatment knobs: `TaskCheckboxStyle.strikethroughCompletedTasks`
   gates the completed label's strikethrough (default on, as before),
   `MarkdownEditorTheme.completedTaskText` colors the completed label (nil =
