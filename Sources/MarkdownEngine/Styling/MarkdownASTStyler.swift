@@ -437,9 +437,13 @@ enum MarkdownASTStyler {
         // kerned slot leaves a gap/overlap over the raw digits).
         // A non-numeric style keeps the overlay on even when the computed number
         // MATCHES the source digits — `1.` still has to display as `a.`.
+        // A fixed marker slot (markerSlotWidth on the grid) forces the overlay
+        // too: the painted marker is CENTERED in the slot, and only the
+        // overlay path can place the glyphs off the source position.
+        let slotCentered = ctx.config.lists.effectiveMarkerSlotWidth != nil
         let orderedOverlayActive = item.ordered && item.checkbox == nil && item.number != nil
             && displayNumber != nil
-            && (displayNumber != item.number || markerStyle != .numeric)
+            && (displayNumber != item.number || markerStyle != .numeric || slotCentered)
             && !MarkdownStyler.caretRevealsOrderedMarker(caret: ctx.caret, syntax: orderedSyntax)
             && !ctx.selectionIntersects(orderedSyntax)
         // Keep the source punctuation (`.` or `)`) when overlaying, so a paren list stays a paren list.
@@ -486,10 +490,13 @@ enum MarkdownASTStyler {
             ps.firstLineHeadIndent = gridDepthIndent
             // The slot can widen freely but only narrow until the final spacer
             // char would reach a negative advance (content folding back over
-            // the marker glyphs).
+            // the marker glyphs). With a fixed marker COLUMN configured
+            // (markerSlotWidth), content hangs column + gap after the marker
+            // origin instead of the bare gap.
             let spacerRange = NSRange(location: item.contentRange.location - 1, length: 1)
             let spacerWidth = HeadingHelpers.textWidth(ctx.ns.substring(with: spacerRange), font: ctx.baseFont)
-            let slot = max(gap, markerWidth - spacerWidth + 0.5)
+            let contentOffset = gap + (ctx.config.lists.effectiveMarkerSlotWidth ?? 0)
+            let slot = max(contentOffset, markerWidth - spacerWidth + 0.5)
             ps.headIndent = gridDepthIndent + slot
             attrs.append((line, [.paragraphStyle: ps]))
             // Collapse the leading whitespace so the SOURCE indent stops being
