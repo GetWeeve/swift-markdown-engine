@@ -48,6 +48,18 @@ public struct MarkdownEditorTheme: Sendable {
     /// Foreground color for heading marker glyphs (`#`, `##`, …).
     public var headingMarker: NSColor
 
+    // MARK: Blockquotes
+
+    /// Fill of the painted vertical quote bar(s). `nil` (the default) keeps
+    /// the historical half-transparent ``mutedText``. A configured color is
+    /// used exactly as given — no alpha is layered on top.
+    public var blockquoteBar: NSColor?
+    /// Foreground color of blockquote content. `nil` (the default) keeps the
+    /// historical behavior of muting quotes in ``mutedText``. The `>` marker
+    /// glyphs revealed on the active line stay on ``mutedText`` either way,
+    /// and inline constructs keep their own colors as usual.
+    public var blockquoteText: NSColor?
+
     // MARK: Links
 
     /// Foreground color for hyperlinks that resolve to an URL.
@@ -96,6 +108,8 @@ public struct MarkdownEditorTheme: Sendable {
         disabledText: NSColor = .tertiaryLabelColor,
         headingText: NSColor? = nil,
         headingMarker: NSColor = .gray,
+        blockquoteBar: NSColor? = nil,
+        blockquoteText: NSColor? = nil,
         link: NSColor = .linkColor,
         incompleteLink: NSColor = .systemBlue,
         findMatchHighlight: NSColor = .systemYellow,
@@ -110,6 +124,8 @@ public struct MarkdownEditorTheme: Sendable {
         self.disabledText = disabledText
         self.headingText = headingText
         self.headingMarker = headingMarker
+        self.blockquoteBar = blockquoteBar
+        self.blockquoteText = blockquoteText
         self.link = link
         self.incompleteLink = incompleteLink
         self.findMatchHighlight = findMatchHighlight

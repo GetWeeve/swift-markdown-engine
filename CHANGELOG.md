@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Blockquote styling knobs: `BlockquoteStyle.barWidth` / `textIndent` expose
+  the previously hard-coded bar width and per-level indent (defaults 3/18 as
+  before), `MarkdownEditorTheme.blockquoteBar` colors the painted bar (nil =
+  the historical half-transparent muted ink), and
+  `MarkdownEditorTheme.blockquoteText` lifts the historical content muting
+  (nil = muted, as before; revealed `>` markers stay muted either way).
 - Custom heading typeface and color: `HeadingStyle.fontName` renders headings
   in a specific PostScript face (honored exactly, so the chosen weight is
   respected; an unresolvable name falls back to the stock bold base font),
