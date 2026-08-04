@@ -491,8 +491,16 @@ public struct TableStyle: Sendable {
     /// historical square-cornered rendering exactly.
     public var cornerRadius: CGFloat
 
-    public init(cornerRadius: CGFloat = 0) {
+    /// Whether interior vertical column separators are drawn. `true` (the
+    /// default) keeps the historical full-grid look. When `false`, only the
+    /// outer border and the horizontal rules between rows (including the
+    /// header/body rule) are painted; the horizontal rules span the full
+    /// inner width, and column sizing and cell padding are unchanged.
+    public var verticalRules: Bool
+
+    public init(cornerRadius: CGFloat = 0, verticalRules: Bool = true) {
         self.cornerRadius = max(0, cornerRadius)
+        self.verticalRules = verticalRules
     }
 
     public static let `default` = TableStyle()

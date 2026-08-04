@@ -152,11 +152,13 @@ extension MarkdownStyler {
         // highlighted under one config and literal under another — those must
         // never share a cached image.
         let extensionKey = ctx.configuration.extensionRegistry.fingerprint
-        // The wrapper radius changes the rendered pixels, so it is part of
-        // the cache identity like every other rendering input.
+        // The wrapper radius and rule orientation change the rendered pixels,
+        // so they are part of the cache identity like every other rendering
+        // input.
         let radiusKey = ctx.configuration.table.cornerRadius
+        let verticalRulesKey = ctx.configuration.table.verticalRules ? 1 : 0
         let key = (themeKeyPrefix(ctx: ctx, appearance: appearance)
-            + "|x\(extensionKey)|w\(widthKey)|r\(radiusKey)|" + source) as NSString
+            + "|x\(extensionKey)|w\(widthKey)|r\(radiusKey)|v\(verticalRulesKey)|" + source) as NSString
         if let cached = tableImageCache.object(forKey: key) {
             return (cached, false)
         }
@@ -169,7 +171,8 @@ extension MarkdownStyler {
             appearance: appearance,
             availableWidth: availableWidth,
             extensions: ctx.configuration.extensions,
-            cornerRadius: ctx.configuration.table.cornerRadius
+            cornerRadius: ctx.configuration.table.cornerRadius,
+            verticalRules: ctx.configuration.table.verticalRules
         )
         tableImageCache.setObject(image, forKey: key)
         return (image, true)
@@ -465,7 +468,8 @@ extension MarkdownStyler {
         appearance: NSAppearance,
         availableWidth: CGFloat,
         extensions: [any MarkdownExtension] = [],
-        cornerRadius: CGFloat = 0
+        cornerRadius: CGFloat = 0,
+        verticalRules: Bool = true
     ) -> NSImage {
         let columnCount = table.alignments.count
         let cellHPadding: CGFloat = 12
@@ -647,13 +651,20 @@ extension MarkdownStyler {
                 height: rowContentHeights[0] + 2 * cellVPadding
             )).fill()
 
-            // Internal separators
+            // Internal separators. Stroked in the border color explicitly:
+            // the context's default stroke is black, and the outer border's
+            // setStroke happens later (it moved below the clip restore when
+            // the rounded wrapper landed). Row rules always span the full
+            // inner width; column rules only exist in the full-grid look.
+            borderColor.setStroke()
             let separators = NSBezierPath()
             separators.lineWidth = borderWidth
-            for i in 1..<columnCount {
-                let x = columnLeft[i] - borderWidth / 2
-                separators.move(to: NSPoint(x: x, y: 0))
-                separators.line(to: NSPoint(x: x, y: size.height))
+            if verticalRules {
+                for i in 1..<columnCount {
+                    let x = columnLeft[i] - borderWidth / 2
+                    separators.move(to: NSPoint(x: x, y: 0))
+                    separators.line(to: NSPoint(x: x, y: size.height))
+                }
             }
             for i in 1..<rowCount {
                 let y = rowTop[i] - borderWidth / 2

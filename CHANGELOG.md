@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `TableStyle.verticalRules` (default `true`) controls interior column
+  separators in rendered tables. When `false`, only the outer border and the
+  horizontal rules between rows (including the header/body rule) draw, with
+  the horizontal rules spanning the full inner width; column sizing and cell
+  padding are unchanged. The knob participates in the table image cache key.
 - `TableStyle.cornerRadius` rounds the rendered table wrapper's corners:
   interior painting (header fill, separator rules) clips to the rounded
   shape and the outer border rule strokes along the rounded path, staying
@@ -25,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `bodyText` — the `#` glyphs stay on `headingMarker`, and inline constructs
   inside a heading keep their own ink (both opt-in; the defaults are
   unchanged).
+
+### Fixed
+- Interior table rules stroke in the themed rule color again. The rounded
+  wrapper change moved the outer border's `setStroke` below the separator
+  pass, which left interior rules on the drawing context's default black
+  instead of `MarkdownEditorTheme.tableRule`.
 
 ## [0.11.0] - 2026-07-31
 
