@@ -93,6 +93,11 @@ public struct MarkdownEditorTheme: Sendable {
     /// Fill behind a rendered table's header row. `nil` (the default) keeps
     /// the historical ``mutedText`` at 8% alpha.
     public var tableHeaderBackground: NSColor?
+    /// Fill behind a rendered table's body rows (everything below the
+    /// header). `nil` (the default) keeps the historical unfilled body, so
+    /// the editor background shows through. Interior rules and the outer
+    /// border stroke on top, and the fill clips inside a rounded wrapper.
+    public var tableRowBackground: NSColor?
     /// Stroke color of a rendered table's outer border and internal rules.
     /// `nil` (the default) keeps the historical ``mutedText`` at 50% alpha.
     public var tableRule: NSColor?
@@ -114,6 +119,7 @@ public struct MarkdownEditorTheme: Sendable {
         strikethroughColor: NSColor = .labelColor,
         highlightColor: NSColor = .systemOrange.withAlphaComponent(0.4),
         tableHeaderBackground: NSColor? = nil,
+        tableRowBackground: NSColor? = nil,
         tableRule: NSColor? = nil
     ) {
         self.bodyText = bodyText
@@ -130,6 +136,7 @@ public struct MarkdownEditorTheme: Sendable {
         self.strikethroughColor = strikethroughColor
         self.highlightColor = highlightColor
         self.tableHeaderBackground = tableHeaderBackground
+        self.tableRowBackground = tableRowBackground
         self.tableRule = tableRule
     }
 

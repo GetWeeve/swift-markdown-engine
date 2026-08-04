@@ -68,7 +68,8 @@ extension MarkdownStyler {
             + "\(ObjectIdentifier(theme.bodyText))|\(ObjectIdentifier(theme.mutedText))|"
             + "\(ObjectIdentifier(theme.highlightColor))|\(ObjectIdentifier(ctx.codeBackgroundColor))|"
             + "\(ObjectIdentifier(theme.latexLightModeText))|\(ObjectIdentifier(theme.latexDarkModeText))|"
-            + "\(optionalIdentity(theme.tableHeaderBackground))|\(optionalIdentity(theme.tableRule))|"
+            + "\(optionalIdentity(theme.tableHeaderBackground))|\(optionalIdentity(theme.tableRowBackground))|"
+            + "\(optionalIdentity(theme.tableRule))|"
             + "\(ObjectIdentifier(type(of: ctx.services.latex)))"
 
         themeKeyLock.lock()
@@ -92,6 +93,7 @@ extension MarkdownStyler {
             colorKey(theme.latexLightModeText, under: appearance),
             colorKey(theme.latexDarkModeText, under: appearance),
             theme.tableHeaderBackground.map { colorKey($0, under: appearance) } ?? "nil",
+            theme.tableRowBackground.map { colorKey($0, under: appearance) } ?? "nil",
             theme.tableRule.map { colorKey($0, under: appearance) } ?? "nil",
             "\(ObjectIdentifier(type(of: ctx.services.latex)))",
         ].joined(separator: "|")
@@ -618,6 +620,7 @@ extension MarkdownStyler {
 
         let alignments = table.alignments
         let headerFill = theme.tableHeaderBackground.map(resolved) ?? mutedColor(alpha: 0.08)
+        let rowFill = theme.tableRowBackground.map(resolved)
 
         // Clamp so tiny tables can't invert the rounded path.
         let radius = max(0, min(cornerRadius, min(size.width, size.height) / 2 - borderWidth))
@@ -650,6 +653,20 @@ extension MarkdownStyler {
                 width: size.width - 2 * borderWidth,
                 height: rowContentHeights[0] + 2 * cellVPadding
             )).fill()
+
+            // Body row fill — everything below the header, so the rule band
+            // between header and body is covered too; the interior rules and
+            // outer border stroke on top of it afterwards.
+            if let rowFill {
+                let bodyTop = borderWidth + rowContentHeights[0] + 2 * cellVPadding
+                rowFill.setFill()
+                NSBezierPath(rect: NSRect(
+                    x: borderWidth,
+                    y: bodyTop,
+                    width: size.width - 2 * borderWidth,
+                    height: size.height - borderWidth - bodyTop
+                )).fill()
+            }
 
             // Internal separators. Stroked in the border color explicitly:
             // the context's default stroke is black, and the outer border's
