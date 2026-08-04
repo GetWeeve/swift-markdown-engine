@@ -285,6 +285,64 @@ public struct InlineCodeStyle: Sendable {
 
 // MARK: - Lists
 
+/// How an ordered item's computed position is rendered in its painted marker.
+///
+/// Only the painted overlay changes; the source digits are untouched, so the
+/// file stays valid CommonMark whatever it says (mirroring how display
+/// numbering already works).
+public enum OrderedMarkerStyle: Sendable, Equatable {
+    /// `1.` `2.` `3.` — the historical rendering.
+    case numeric
+    /// `a.` `b.` … `z.` `aa.` (spreadsheet-style bijective base-26).
+    case lowerAlpha
+    /// `A.` `B.` … `Z.` `AA.`
+    case upperAlpha
+    /// `i.` `ii.` `iii.` `iv.` …
+    case lowerRoman
+    /// `I.` `II.` `III.` `IV.` …
+    case upperRoman
+
+    /// The marker label (without punctuation) for the 1-based `number`.
+    /// Zero/negative positions cannot come out of display numbering, but a
+    /// literal `0.` in the source falls back to the digits themselves.
+    public func label(for number: Int) -> String {
+        guard number > 0 else { return "\(number)" }
+        switch self {
+        case .numeric: return "\(number)"
+        case .lowerAlpha: return Self.alphaLabel(number)
+        case .upperAlpha: return Self.alphaLabel(number).uppercased()
+        case .lowerRoman: return Self.romanLabel(number)
+        case .upperRoman: return Self.romanLabel(number).uppercased()
+        }
+    }
+
+    /// Bijective base-26: 1 → a … 26 → z, 27 → aa, 28 → ab.
+    private static func alphaLabel(_ number: Int) -> String {
+        var n = number
+        var label = ""
+        while n > 0 {
+            n -= 1
+            label = String(UnicodeScalar(UInt8(97 + n % 26))) + label
+            n /= 26
+        }
+        return label
+    }
+
+    private static func romanLabel(_ number: Int) -> String {
+        let values = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1]
+        let numerals = ["m", "cm", "d", "cd", "c", "xc", "l", "xl", "x", "ix", "v", "iv", "i"]
+        var n = number
+        var label = ""
+        for (value, numeral) in zip(values, numerals) {
+            while n >= value {
+                label += numeral
+                n -= value
+            }
+        }
+        return label
+    }
+}
+
 /// Behavior toggles and metrics for ordered / unordered list editing.
 public struct ListStyle: Sendable {
     /// Master switch for list-related editing helpers (auto-continue,
@@ -299,19 +357,34 @@ public struct ListStyle: Sendable {
     public var maximumNestingLevel: Int
     /// Extra line height added on top of the default to give list items room.
     public var extraLineHeight: CGFloat
+    /// Marker rendering style per nesting depth for ordered items. Depth 0
+    /// (top level) uses the first entry and deeper levels CYCLE through the
+    /// array, so `[.numeric, .lowerAlpha, .lowerRoman]` renders `1.` / `a.` /
+    /// `i.` and starts over one level further down. The default — a single
+    /// `.numeric` — keeps every level numeric, the historical rendering.
+    public var orderedMarkerStyles: [OrderedMarkerStyle]
 
     public init(
         helpersEnabled: Bool = true,
         autoClosePairsEnabled: Bool = true,
         indentPerLevel: CGFloat = 27.5,
         maximumNestingLevel: Int = 3,
-        extraLineHeight: CGFloat = 2
+        extraLineHeight: CGFloat = 2,
+        orderedMarkerStyles: [OrderedMarkerStyle] = [.numeric]
     ) {
         self.helpersEnabled = helpersEnabled
         self.autoClosePairsEnabled = autoClosePairsEnabled
         self.indentPerLevel = indentPerLevel
         self.maximumNestingLevel = maximumNestingLevel
         self.extraLineHeight = extraLineHeight
+        self.orderedMarkerStyles = orderedMarkerStyles
+    }
+
+    /// The ordered-marker style for a 0-based nesting `depth`, cycling
+    /// through ``orderedMarkerStyles`` (an empty array reads as `.numeric`).
+    public func orderedMarkerStyle(forDepth depth: Int) -> OrderedMarkerStyle {
+        guard !orderedMarkerStyles.isEmpty else { return .numeric }
+        return orderedMarkerStyles[max(0, depth) % orderedMarkerStyles.count]
     }
 
     public static let `default` = ListStyle()

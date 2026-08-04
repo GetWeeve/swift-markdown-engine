@@ -47,6 +47,12 @@ public struct MarkdownEditorTheme: Sendable {
     public var headingText: NSColor?
     /// Foreground color for heading marker glyphs (`#`, `##`, …).
     public var headingMarker: NSColor
+    /// Foreground color for painted list marker glyphs — the bullet `•` and
+    /// the ordered `1.` overlays, including the raw source characters those
+    /// painters reveal while the marker sits inside a selection. `nil` (the
+    /// default) keeps the historical behavior: markers render in
+    /// ``bodyText`` like the item content.
+    public var listMarker: NSColor?
 
     // MARK: Links
 
@@ -96,6 +102,7 @@ public struct MarkdownEditorTheme: Sendable {
         disabledText: NSColor = .tertiaryLabelColor,
         headingText: NSColor? = nil,
         headingMarker: NSColor = .gray,
+        listMarker: NSColor? = nil,
         link: NSColor = .linkColor,
         incompleteLink: NSColor = .systemBlue,
         findMatchHighlight: NSColor = .systemYellow,
@@ -110,6 +117,7 @@ public struct MarkdownEditorTheme: Sendable {
         self.disabledText = disabledText
         self.headingText = headingText
         self.headingMarker = headingMarker
+        self.listMarker = listMarker
         self.link = link
         self.incompleteLink = incompleteLink
         self.findMatchHighlight = findMatchHighlight

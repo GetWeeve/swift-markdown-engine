@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Ordered-marker lettering per depth: `ListStyle.orderedMarkerStyles` renders
+  nested ordered markers as letters or roman numerals (`[.numeric,
+  .lowerAlpha, .lowerRoman]` → `1.` / `a.` / `i.`, cycling below that). Only
+  the painted overlay changes — the source digits stay valid CommonMark. The
+  default (a single `.numeric`) keeps every level numeric as before.
+- `MarkdownEditorTheme.listMarker` colors the painted bullet `•` and ordered
+  markers independently of `bodyText` (`nil`, the default, keeps body ink).
 - Custom heading typeface and color: `HeadingStyle.fontName` renders headings
   in a specific PostScript face (honored exactly, so the chosen weight is
   respected; an unresolvable name falls back to the stock bold base font),

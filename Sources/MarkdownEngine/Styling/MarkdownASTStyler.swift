@@ -349,11 +349,17 @@ enum MarkdownASTStyler {
         // tasks (the checkbox branch owns those).
         let orderedSyntax = NSRange(location: item.marker.location,
                                     length: item.contentRange.location - item.marker.location)
+        // The per-depth marker style (1. / a. / i. — .numeric everywhere by
+        // default). Only the painted overlay changes; the source stays digits.
+        let markerStyle = ctx.config.lists.orderedMarkerStyle(forDepth: MarkdownLists.indentLevel(from: ws))
         // Also off while the marker is inside a selection: the painter reveals the
         // raw source digits there, so the slot must revert to raw width (else a
         // kerned slot leaves a gap/overlap over the raw digits).
+        // A non-numeric style keeps the overlay on even when the computed number
+        // MATCHES the source digits — `1.` still has to display as `a.`.
         let orderedOverlayActive = item.ordered && item.checkbox == nil && item.number != nil
-            && displayNumber != nil && displayNumber != item.number
+            && displayNumber != nil
+            && (displayNumber != item.number || markerStyle != .numeric)
             && !MarkdownStyler.caretRevealsOrderedMarker(caret: ctx.caret, syntax: orderedSyntax)
             && !ctx.selectionIntersects(orderedSyntax)
         // Keep the source punctuation (`.` or `)`) when overlaying, so a paren list stays a paren list.
@@ -364,7 +370,7 @@ enum MarkdownASTStyler {
             if orderedOverlayActive, let displayNumber {
                 let gap = ctx.ns.substring(with: NSRange(location: NSMaxRange(item.marker),
                                                          length: item.contentRange.location - NSMaxRange(item.marker)))
-                return HeadingHelpers.textWidth("\(displayNumber)\(orderedPunct)" + gap, font: ctx.baseFont)
+                return HeadingHelpers.textWidth(markerStyle.label(for: displayNumber) + orderedPunct + gap, font: ctx.baseFont)
             }
             return HeadingHelpers.textWidth(ctx.ns.substring(with: markerGroup), font: ctx.baseFont)
         }()
@@ -422,12 +428,13 @@ enum MarkdownASTStyler {
             // content baseline down under the pinned line height); spread across
             // all marker chars so every glyph advance stays positive even when
             // the number shrinks (10 → 9).
+            let display = markerStyle.label(for: displayNumber) + orderedPunct
             let sourceW = (ctx.ns.substring(with: item.marker) as NSString)
                 .size(withAttributes: [.font: ctx.baseFont]).width
-            let displayW = ("\(displayNumber)\(orderedPunct)" as NSString)
+            let displayW = (display as NSString)
                 .size(withAttributes: [.font: ctx.baseFont]).width
             var markerAttrs: [NSAttributedString.Key: Any] = [
-                .orderedMarker: "\(displayNumber)\(orderedPunct)", .foregroundColor: NSColor.clear,
+                .orderedMarker: display, .foregroundColor: NSColor.clear,
             ]
             if abs(displayW - sourceW) > 0.01 {
                 markerAttrs[.kern] = (displayW - sourceW) / CGFloat(max(1, item.marker.length))

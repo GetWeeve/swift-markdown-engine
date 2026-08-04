@@ -547,7 +547,9 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
             let isSelected = selectionRanges.contains(where: { NSIntersectionRange($0, attrRange).length > 0 })
             let raw = storageString.substring(with: attrRange)
             let glyph = (isSelected ? raw : "•") as NSString
-            let glyphAttrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: theme.bodyText]
+            let glyphAttrs: [NSAttributedString.Key: Any] = [
+                .font: font, .foregroundColor: theme.listMarker ?? theme.bodyText,
+            ]
 
             let markerWidth = (raw as NSString).size(withAttributes: [.font: font]).width
             let glyphWidth = glyph.size(withAttributes: glyphAttrs).width
@@ -589,7 +591,9 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
             let isSelected = selectionRanges.contains(where: { NSIntersectionRange($0, attrRange).length > 0 })
             let raw = storageString.substring(with: attrRange)
             let glyph = (isSelected ? raw : number) as NSString
-            let glyphAttrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: theme.bodyText]
+            let glyphAttrs: [NSAttributedString.Key: Any] = [
+                .font: font, .foregroundColor: theme.listMarker ?? theme.bodyText,
+            ]
             let topY = pos.baselineY - font.ascender
             glyph.draw(at: CGPoint(x: pos.x, y: topY), withAttributes: glyphAttrs)
         }
