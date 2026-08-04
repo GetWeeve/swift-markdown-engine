@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Interior table rules stroke in the themed rule color again. The rounded
+  wrapper change moved the outer border's `setStroke` below the separator
+  pass, which left interior rules on the drawing context's default black
+  instead of `MarkdownEditorTheme.tableRule`.
 - Caret x on marker-only list lines in the indent grid: a fresh Enter
   continuation (`- `, `1. `, `- [ ] ` with no content yet) placed the
   insertion point at the raw collapsed-marker advance (the line's left
@@ -31,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the editor's window isn't key.
 
 ### Added
+- `TableStyle.verticalRules` (default `true`) controls interior column
+  separators in rendered tables. When `false`, only the outer border and the
+  horizontal rules between rows (including the header/body rule) draw, with
+  the horizontal rules spanning the full inner width; column sizing and cell
+  padding are unchanged. The knob participates in the table image cache key.
 - `ListStyle.markerSlotWidth` (opt-in, on top of the indent grid): every list
   marker occupies an invisible fixed-width column at its depth indent — the
   painted bullet and ordered marker center horizontally in the column (ordered
