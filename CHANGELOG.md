@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Caret x on marker-only list lines in the indent grid: a fresh Enter
+  continuation (`- `, `1. `, `- [ ] ` with no content yet) placed the
+  insertion point at the raw collapsed-marker advance (the line's left
+  edge) because Core Text drops the content-offset kern when the spacer is
+  the line's last glyph. The insertion indicator now snaps to the
+  paragraph's content origin — exactly where the first typed character
+  lands — for every marker kind. Legacy (nil `markerTextGap`) geometry is
+  untouched.
 - The theme's `link` color now reaches the screen. `NSTextView` layers its
   `linkTextAttributes` over every `.link` range at display time, and AppKit's
   default paints them `.linkColor` blue — silently overriding the foreground

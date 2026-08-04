@@ -13,6 +13,7 @@ extension NativeTextView {
     override func updateInsertionPointStateAndRestartTimer(_ restartFlag: Bool) {
         super.updateInsertionPointStateAndRestartTimer(restartFlag)
         applyBlockImageCaretPolicy()
+        fixMarkerOnlyLineCaret()
         DispatchQueue.main.async { [weak self] in self?.fixPhantomTrailingCaret() }
     }
 
@@ -74,6 +75,7 @@ extension NativeTextView {
             caretIndicatorObservation = indicator.observe(\.frame, options: [.new]) { [weak self] _, _ in
                 guard let self, !self.isApplyingCaretShift else { return }
                 self.applyBlockImageCaretPolicy()
+                self.fixMarkerOnlyLineCaret()
                 self.fixPhantomTrailingCaret()
             }
         }
