@@ -175,6 +175,31 @@ struct MarkdownLists {
             return insertAutoPair(open: replacementString, close: closeChar)
         }
 
+        // SPACE: bare-checkbox shorthand (opt-in) — a line that so far reads
+        // `[]`, `[ ]`, or `- []` becomes an unchecked task item. Only the
+        // text BEFORE the caret decides, so text after the caret is kept.
+        if replacementString == " " && affectedCharRange.length == 0 && !isInCodeBlock {
+            guard listsEnabled && activeConfig.lists.taskShorthandEnabled else { return true }
+            let nsText = textView.string as NSString
+            let caret = min(affectedCharRange.location, nsText.length)
+            let currentLineRange = nsText.lineRange(for: NSRange(location: caret, length: 0))
+            let prefixRange = NSRange(
+                location: currentLineRange.location,
+                length: caret - currentLineRange.location
+            )
+            let prefix = nsText.substring(with: prefixRange)
+            let indent = prefix.prefix(while: { $0 == " " || $0 == "\t" })
+            let token = prefix.dropFirst(indent.count)
+            guard token == "[]" || token == "[ ]" || token == "- []" else { return true }
+            let replacement = indent + "- [ ] "
+            MarkdownLists.performEdit(textView, replace: prefixRange, with: String(replacement))
+            textView.setSelectedRange(NSRange(
+                location: prefixRange.location + (String(replacement) as NSString).length,
+                length: 0
+            ))
+            return false
+        }
+
         // TAB: indent list items (skip in code blocks)
         if replacementString == "\t" && !isInCodeBlock {
             guard listsEnabled else { return true }

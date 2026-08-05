@@ -418,6 +418,13 @@ public struct ListStyle: Sendable {
     public var helpersEnabled: Bool
     /// Master switch for auto-closing pairs `()`, `{}`, `[]` while typing.
     public var autoClosePairsEnabled: Bool
+    /// Bare-checkbox shorthand: typing a space when the line so far reads
+    /// `[]`, `[ ]`, or `- []` (after optional leading indent) rewrites that
+    /// prefix into an unchecked `- [ ] ` task item, keeping the indent and
+    /// any text after the caret. Off by default — the historical behavior
+    /// (the space inserts literally) is unchanged. Requires
+    /// ``helpersEnabled``; inert inside code blocks.
+    public var taskShorthandEnabled: Bool
     /// Indent (in points) that one nesting level adds to the list item.
     public var indentPerLevel: CGFloat
     /// Maximum nesting level reachable by pressing Tab inside a list.
@@ -477,6 +484,7 @@ public struct ListStyle: Sendable {
     public init(
         helpersEnabled: Bool = true,
         autoClosePairsEnabled: Bool = true,
+        taskShorthandEnabled: Bool = false,
         indentPerLevel: CGFloat = 27.5,
         maximumNestingLevel: Int = 3,
         extraLineHeight: CGFloat = 2,
@@ -486,6 +494,7 @@ public struct ListStyle: Sendable {
     ) {
         self.helpersEnabled = helpersEnabled
         self.autoClosePairsEnabled = autoClosePairsEnabled
+        self.taskShorthandEnabled = taskShorthandEnabled
         self.indentPerLevel = indentPerLevel
         self.maximumNestingLevel = maximumNestingLevel
         self.extraLineHeight = extraLineHeight

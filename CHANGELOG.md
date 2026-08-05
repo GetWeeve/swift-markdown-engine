@@ -42,6 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the editor's window isn't key.
 
 ### Added
+- `ListStyle.taskShorthandEnabled` (default `false`): typing a space when the
+  line so far reads `[]`, `[ ]`, or `- []` (after optional leading indent)
+  rewrites that prefix into an unchecked `- [ ] ` task item, keeping the
+  indent and any text after the caret. Requires `helpersEnabled`; inert in
+  code blocks, mid-line, for checked markers, and for selection-replacing
+  spaces.
 - `MarkdownEditorTheme.tableRowBackground` fills a rendered table's body rows
   (everything below the header). `nil` (the default) keeps the historical
   unfilled body. The fill clips inside a rounded wrapper, interior rules and
