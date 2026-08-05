@@ -73,6 +73,83 @@ struct MarkdownLists {
         return false
     }
 
+    /// Backspace at a list item's content origin removes the whole marker in
+    /// one step — the same class of helper as Enter-on-empty — so the user
+    /// never walks character-by-character through a hidden `- [ ] ` (or `- `,
+    /// `1. `) and briefly sees raw task syntax demote into a bullet with a
+    /// leftover `[`.
+    ///
+    /// - Empty item with a previous line: delete the preceding newline and
+    ///   the marker, landing the caret at the end of the previous line.
+    /// - Empty item at document start: delete the marker only.
+    /// - Non-empty item: unwrap the marker and keep the content on the line.
+    ///
+    /// Returns `true` when the keystroke was handled (caller should consume
+    /// the command). Requires ``ListStyle/helpersEnabled``.
+    static func handleDeleteBackward(textView: NSTextView) -> Bool {
+        let activeConfig = (textView as? NativeTextView)?.configuration ?? .default
+        guard activeConfig.lists.helpersEnabled else { return false }
+
+        let sel = textView.selectedRange()
+        guard sel.length == 0 else { return false }
+
+        let nsText = textView.string as NSString
+        let caret = min(sel.location, nsText.length)
+        guard caret >= 0 else { return false }
+
+        // Mirror the insertion path: list helpers stay inert inside fences.
+        if nsText.length > 0,
+           MarkdownDetection.isInsideCodeBlock(location: caret, in: textView.string) {
+            return false
+        }
+
+        let lineRange = nsText.lineRange(for: NSRange(location: caret, length: 0))
+        let hasNewline = lineRange.length > 0
+            && nsText.character(at: NSMaxRange(lineRange) - 1) == 0x0A
+        // Match against the line BODY only — `listRegex`'s trailing `\s+`
+        // would otherwise swallow the line-ending newline into the marker
+        // prefix and push `contentStart` past the caret.
+        let bodyLength = hasNewline ? lineRange.length - 1 : lineRange.length
+        let bodyRange = NSRange(location: lineRange.location, length: bodyLength)
+        let line = nsText.substring(with: bodyRange)
+        let lineNS = line as NSString
+        guard let match = listRegex.firstMatch(
+            in: line,
+            options: [],
+            range: NSRange(location: 0, length: lineNS.length)
+        ), match.range.location == 0 else { return false }
+
+        let prefixLength = match.range.length
+        let contentStart = lineRange.location + prefixLength
+        // Only the content-origin caret — mid-marker edits keep raw control.
+        guard caret == contentStart else { return false }
+
+        let contentLength = max(0, (lineRange.location + bodyLength) - contentStart)
+        let contentText = nsText
+            .substring(with: NSRange(location: contentStart, length: contentLength))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let isEmpty = contentText.isEmpty
+
+        if isEmpty, lineRange.location > 0,
+           nsText.character(at: lineRange.location - 1) == 0x0A {
+            // `\n` + marker (+ empty body). Leave any trailing newline after
+            // the line alone so the following paragraph stays put.
+            let removal = NSRange(
+                location: lineRange.location - 1,
+                length: (contentStart - lineRange.location) + 1
+            )
+            performEdit(textView, replace: removal, with: "")
+            textView.setSelectedRange(NSRange(location: lineRange.location - 1, length: 0))
+            return true
+        }
+
+        // Unwrap the marker in place (empty at doc start, or non-empty item).
+        let removal = NSRange(location: lineRange.location, length: prefixLength)
+        performEdit(textView, replace: removal, with: "")
+        textView.setSelectedRange(NSRange(location: lineRange.location, length: 0))
+        return true
+    }
+
     /// Mirror Enter-key quote continuation for multi-line pastes: when `location`
     /// sits on a blockquote line, prefix every line after the first with that
     /// line's `>` marker run so the whole paste stays inside the quote. Returns
