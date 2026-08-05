@@ -850,6 +850,12 @@ extension NativeTextViewCoordinator {
         if commandSelector == #selector(NSResponder.insertBacktab(_:)) {
             return handleBacktab(textView)
         }
+        // Backspace at a list item's content origin removes the whole marker
+        // in one step (tasks included) so hidden `- [ ] ` never peels into
+        // raw `- [ ]` / `- []` / bullet+`[` while exiting the item.
+        if commandSelector == #selector(NSResponder.deleteBackward(_:)) {
+            if MarkdownLists.handleDeleteBackward(textView: textView) { return true }
+        }
         // While an inline [[…]] / ![[…]] preview is open, route ↑/↓/Enter/Esc to the embedder's
         // autocomplete list (it returns true to consume the key; false → normal editor handling).
         if (isWikiLinkActive || isImageEmbedActive), let handler = onInlinePreviewKey {

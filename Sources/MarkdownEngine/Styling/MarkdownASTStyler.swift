@@ -506,12 +506,26 @@ enum MarkdownASTStyler {
             if wsRange.length > 0 {
                 attrs.append((wsRange, [.font: ctx.inlineMarkerFont]))
             }
+            // Empty grid-hidden tasks collapse EVERY marker glyph to the
+            // 0.1pt inline-marker font. With no body-font content on the
+            // line, TextKit parks the baseline at the fragment's bottom, so
+            // the drawn checkbox (centered from that baseline with body
+            // metrics) sits too low relative to the full-height caret. Keep
+            // the trailing spacer at body font as a strut — clear ink still
+            // hides it — and subtract its real advance from the kern so the
+            // content origin stays on the slot edge. Content lines already
+            // establish a normal baseline, so they keep the historical
+            // tiny-font spacer (actual advance ≈ 0; kern = slot − marker).
+            let emptyTaskBodyStrut = gridHiddenTask && item.contentRange.length == 0
+            let spacerKern = emptyTaskBodyStrut
+                ? slot - markerWidth - spacerWidth
+                : slot - markerWidth
             // Land the content exactly on the slot edge by kerning the final
             // spacer char. markerWidth already measures the DISPLAY marker
             // while the ordered overlay is active and the raw marker in every
             // reveal state, so the same correction holds for every marker kind
             // — content doesn't jump when the caret enters/leaves the syntax.
-            attrs.append((spacerRange, [.kern: slot - markerWidth]))
+            attrs.append((spacerRange, [.kern: spacerKern]))
         } else {
             ps.defaultTabInterval = ctx.config.lists.indentPerLevel
             ps.firstLineHeadIndent = ctx.config.lists.indentPerLevel
@@ -549,7 +563,16 @@ enum MarkdownASTStyler {
             let postGap = NSRange(location: NSMaxRange(box),
                                   length: item.contentRange.location - NSMaxRange(box))
             if postGap.length > 0 {
-                attrs.append((postGap, [.foregroundColor: NSColor.clear, .font: ctx.inlineMarkerFont]))
+                // See emptyTaskBodyStrut above: an empty grid task needs the
+                // trailing spacer at body font for a correct baseline. Clear
+                // ink still hides the glyph; the slot kern owns its advance.
+                // Set `.font` explicitly (don't rely on a prior base-font run)
+                // so a later restyle can't leave a stale tiny font on the strut.
+                if gridHiddenTask && item.contentRange.length == 0 {
+                    attrs.append((postGap, [.foregroundColor: NSColor.clear, .font: ctx.baseFont]))
+                } else {
+                    attrs.append((postGap, [.foregroundColor: NSColor.clear, .font: ctx.inlineMarkerFont]))
+                }
             }
             if item.checked, NSMaxRange(item.range) > NSMaxRange(box) {
                 let label = NSRange(location: NSMaxRange(box), length: NSMaxRange(item.range) - NSMaxRange(box))

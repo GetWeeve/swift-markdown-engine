@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Empty grid-hidden task lines (`- [ ] ` with no content) no longer park the
+  text baseline at the fragment bottom. Collapsing every marker glyph to the
+  0.1pt inline-marker font left the line without a body-font strut, so the
+  drawn checkbox (centered from that baseline with body metrics) sat too low
+  relative to the caret. The trailing spacer now keeps the body font on empty
+  tasks only; its kern subtracts the real advance so the content origin stays
+  on the slot edge. Content task lines are unchanged.
+- Backspace at a list item's content origin now removes the whole marker in
+  one step (tasks, bullets, and ordered items) when `helpersEnabled` is on —
+  the same class of helper as Enter-on-empty. Empty items with a previous
+  line merge onto it; non-empty items unwrap the marker and keep the content.
+  Previously, backspace walked character-by-character through a hidden
+  `- [ ] `, briefly revealing raw task syntax and demoting to a bullet with a
+  leftover `[`. Mid-marker carets, selections, code fences, and helpers-off
+  stay on AppKit's default delete.
 - Caret-follow in `.scrolls` mode now works for every editor, not only the
   reading column. AppKit's native `scrollRangeToVisible` routes through the
   absent TextKit 1 layout manager in a TextKit 2 text view and silently
