@@ -21,9 +21,11 @@ struct InlineExtensionBoxTests {
 
     /// A span rendered as a control: opaque content, no reveal, 26pt wide.
     private struct BoxExtension: MarkdownExtension {
+        var width: CGFloat = 26
+
         var id: String { "box" }
         var inline: InlineSyntax? {
-            InlineSyntax(open: "[t=", close: "]", parsesContent: false, inlineBoxWidth: 26)
+            InlineSyntax(open: "[t=", close: "]", parsesContent: false, inlineBoxWidth: width)
         }
 
         func contentAttributes(theme _: MarkdownEditorTheme) -> [NSAttributedString.Key: Any] {
@@ -147,6 +149,34 @@ struct InlineExtensionBoxTests {
             "the caret drops the shrink, so a plain span's delimiters return to the body font"
         )
         #expect(snapshot(resting) != snapshot(caretInside))
+    }
+
+    /// The attribute tests above say what the styler asks for; this one says
+    /// TextKit grants it. Two widths of the same document differ by exactly the
+    /// difference in widths, so a reserved point is a laid-out point.
+    @Test("the reserved width is the width the line gains")
+    func reservedSpaceBecomesLaidOutSpace() {
+        let wide = laidOutWidth(document, extensions: [BoxExtension(width: 26)])
+        let narrow = laidOutWidth(document, extensions: [BoxExtension(width: 6)])
+        #expect(abs((wide - narrow) - 20) < 0.01)
+    }
+
+    /// Width of the document's single line once the styler's attributes are on
+    /// it, measured by TextKit rather than derived from the attributes.
+    private func laidOutWidth(_ text: String, extensions: [any MarkdownExtension]) -> CGFloat {
+        let storage = NSTextStorage(string: text)
+        let full = NSRange(location: 0, length: storage.length)
+        storage.addAttribute(.font, value: NSFont(name: fontName, size: base) ?? .systemFont(ofSize: base), range: full)
+        for (range, values) in attributes(text, extensions: extensions) {
+            storage.addAttributes(values, range: range)
+        }
+        let container = NSTextContainer(size: CGSize(width: 10_000, height: 10_000))
+        container.lineFragmentPadding = 0
+        let layoutManager = NSLayoutManager()
+        layoutManager.addTextContainer(container)
+        storage.addLayoutManager(layoutManager)
+        layoutManager.ensureLayout(for: container)
+        return layoutManager.usedRect(for: container).width
     }
 
     @Test("two registries differing only in the box width parse under distinct keys")
