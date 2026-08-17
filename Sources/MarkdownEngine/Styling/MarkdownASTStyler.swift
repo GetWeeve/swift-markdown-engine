@@ -1030,7 +1030,9 @@ enum MarkdownASTStyler {
                 // Last, so the reserved space wins over the content and child
                 // attributes above: a box IS the span's visual form.
                 if let boxWidth {
-                    reserveInlineBox(width: boxWidth, over: node.range, ctx: ctx, into: &attrs)
+                    reserveInlineBox(
+                        width: boxWidth, id: node.extensionID, over: node.range, ctx: ctx, into: &attrs
+                    )
                 }
 
             case .code(let range, let contentRange):
@@ -1072,7 +1074,7 @@ enum MarkdownASTStyler {
     /// stepping through the span never lands inside it and the line's height is
     /// the paragraph's, not the box's.
     private static func reserveInlineBox(
-        width: CGFloat, over range: NSRange, ctx: Ctx, into attrs: inout [StyledRange]
+        width: CGFloat, id: String, over range: NSRange, ctx: Ctx, into attrs: inout [StyledRange]
     ) {
         guard range.length > 0, width > 0 else { return }
         let hidden = ctx.inlineMarkerFont
@@ -1080,6 +1082,9 @@ enum MarkdownASTStyler {
             .font: hidden,
             .foregroundColor: NSColor.clear,
             .kern: -hidden.pointSize,
+            // The span keeps no glyphs of its own, so mark it: pointer, caret,
+            // and delete handling all need to recognize the box afterwards.
+            .inlineExtensionBox: id,
         ]))
         attrs.append((NSRange(location: range.location, length: 1), [
             .font: hidden,
