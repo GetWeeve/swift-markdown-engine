@@ -136,7 +136,8 @@ config.extensions = [HighlightExtension(), StrikethroughExtension(), ContainerEx
 
 Unregistered syntax stays literal text. An extension contributes an inline
 form (`InlineSyntax`), a fenced block form (`BlockSyntax`), or both — plus the
-attributes for its content and an HTML wrapper for rich copy. The parser owns
+attributes for its content, an HTML wrapper for rich copy, and optionally a
+plain-text form for the text flavors. The parser owns
 all geometry, marker/fence hiding, caret reveal, and incremental restyling, so
 extensions behave identically to built-ins and cannot affect neighboring
 constructs. Conform to `MarkdownExtension` to add your own.

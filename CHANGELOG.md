@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- A selection now serializes identically on every path out of the editor.
+  `copy(_:)` was the only override, so a drag — which writes to the drag's own
+  pasteboard, never `NSPasteboard.general` — fell back to AppKit's
+  serialization of the styled storage. `writeSelection(to:type:)` is now
+  overridden too, and both funnel through one `MarkdownPasteboardWriter`
+  `Selection` that derives every flavor in one place, so a flavor cannot be
+  clean on one path and raw on another. The same seam serves a service reading
+  the selection.
 - Empty grid-hidden task lines (`- [ ] ` with no content) no longer park the
   text baseline at the fragment bottom. Collapsing every marker glyph to the
   0.1pt inline-marker font left the line without a body-font strut, so the
@@ -57,6 +65,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the editor's window isn't key.
 
 ### Added
+- `MarkdownExtension.plainText(content:)` (default `nil`): the extension's say
+  over the plain-text copy flavors, mirroring what `html(childrenHTML:)` gives
+  it over HTML. `nil` keeps the construct exactly as written — today's
+  behavior for every extension — `""` drops it, `content` keeps the content
+  and drops the markers. Applied by the new public
+  `MarkdownPlainTextRenderer.plainText(from:extensions:)`, which walks the same
+  block-scoped tokens the editor styles from, so a construct quoted inside a
+  fenced code block stays literal.
 - `ListStyle.taskShorthandEnabled` (default `false`): typing a space when the
   line so far reads `[]`, `[ ]`, or `- []` (after optional leading indent)
   rewrites that prefix into an unchecked `- [ ] ` task item, keeping the

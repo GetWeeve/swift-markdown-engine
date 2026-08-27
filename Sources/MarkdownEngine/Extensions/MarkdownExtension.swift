@@ -141,6 +141,20 @@ public protocol MarkdownExtension: Sendable {
     /// Wrap the rendered inner HTML for the clean-copy path
     /// (`childrenHTML` is already escaped / recursively rendered).
     func html(childrenHTML: String) -> String
+    /// The construct's plain-text form for the copy path, or `nil` (the
+    /// default) to keep it exactly as written, markers included.
+    ///
+    /// The plain-text flavor of a copy is RAW markdown, so that a paste back
+    /// into an editor round-trips byte-exact. A construct that renders as
+    /// something other than its own characters — a span laid out as a box
+    /// (``InlineSyntax/inlineBoxWidth``), anything ``html(childrenHTML:)``
+    /// omits — would otherwise carry its source syntax out of the app on every
+    /// copy, cut and drag. Return `""` to drop it, or `content` to keep the
+    /// content and drop the markers.
+    ///
+    /// `content` is the raw text between the markers (between the fences, for a
+    /// block), with nested markup left as written.
+    func plainText(content: String) -> String?
 }
 
 public extension MarkdownExtension {
@@ -150,6 +164,8 @@ public extension MarkdownExtension {
     // first.
     var inline: InlineSyntax? { nil }
     var block: BlockSyntax? { nil }
+
+    func plainText(content _: String) -> String? { nil }
 }
 
 // MARK: - Parser-facing registry (internal)
