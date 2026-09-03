@@ -21,6 +21,55 @@
 import AppKit
 import Foundation
 
+// MARK: - Content rule
+
+/// An extension's own test for whether a candidate span is one it can handle,
+/// applied to the content between the delimiters.
+///
+/// Delimiters are sometimes looser than the construct they stand for. A
+/// citation written `[t=12.0-19.5]` opens on `[t=` and closes on `]`, and so
+/// does `[t=hello]` — but only the first is a time range the embedder can
+/// resolve. Without a rule the extension claims both, and a construct laid out
+/// as a box (``InlineSyntax/inlineBoxWidth``) then reserves blank line space
+/// for characters it will never draw: text the reader has typed, still in the
+/// document, no longer on screen.
+///
+/// A rule that returns false leaves the candidate literal text, exactly as if
+/// the extension were not registered — scanning continues, so a real span
+/// later in the line, or nested inside the rejected one, is still found.
+///
+/// The rule is consulted while parsing, once per candidate span, after the
+/// delimiter and run checks have already passed. It must be cheap,
+/// synchronous, and free of side effects, and like the rest of the extension
+/// seam it decides nothing about ranges — only yes or no.
+public struct InlineContentRule: Sendable, Equatable {
+    /// Stable identity for the rule, e.g. `"resolvable-time-range"`.
+    ///
+    /// Parse results are cached per registry (``InlineSyntax`` is `Equatable`
+    /// and the registry has a fingerprint), and a closure has no identity to
+    /// key a cache on, so this stands in for one: two rules carrying the same
+    /// `id` are treated as the same rule. Give each rule a distinct id, and
+    /// change it whenever the rule's answers change.
+    public let id: String
+
+    private let predicate: @Sendable (String) -> Bool
+
+    public init(id: String, accepts: @escaping @Sendable (String) -> Bool) {
+        self.id = id
+        self.predicate = accepts
+    }
+
+    /// Whether a candidate span carrying `content` between its delimiters is
+    /// one this extension handles.
+    public func accepts(_ content: String) -> Bool {
+        predicate(content)
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
 // MARK: - Syntax rule
 
 /// The syntax of a delimited span, mirroring the semantics of the engine's
@@ -70,6 +119,14 @@ public struct InlineSyntax: Sendable, Equatable {
     /// laid out; the box is the span's entire visual form. `nil` (the default)
     /// lays the span out as text with the usual marker mute/reveal.
     public var inlineBoxWidth: CGFloat?
+    /// Narrows the syntax to the spans the extension can actually handle: a
+    /// candidate whose content the rule rejects stays literal text.
+    ///
+    /// `nil` (the default) claims every span the delimiters match, which is
+    /// right for a construct whose delimiters already say everything (`==x==`)
+    /// and wrong for one whose content has a grammar of its own. See
+    /// ``InlineContentRule``.
+    public var contentRule: InlineContentRule?
 
     public init(
         open: String,
@@ -78,7 +135,8 @@ public struct InlineSyntax: Sendable, Equatable {
         requiresNonEmptyContent: Bool = true,
         rejectsOpenerRun: Bool = true,
         rejectsCloserRun: Bool = false,
-        inlineBoxWidth: CGFloat? = nil
+        inlineBoxWidth: CGFloat? = nil,
+        contentRule: InlineContentRule? = nil
     ) {
         self.open = open
         self.close = close
@@ -87,6 +145,7 @@ public struct InlineSyntax: Sendable, Equatable {
         self.rejectsOpenerRun = rejectsOpenerRun
         self.rejectsCloserRun = rejectsCloserRun
         self.inlineBoxWidth = inlineBoxWidth
+        self.contentRule = contentRule
     }
 }
 
@@ -217,7 +276,8 @@ struct ExtensionRegistry {
                     parts += ["i", framed(s.open), framed(s.close),
                               "\(s.parsesContent)", "\(s.requiresNonEmptyContent)",
                               "\(s.rejectsOpenerRun)", "\(s.rejectsCloserRun)",
-                              s.inlineBoxWidth.map { "\($0)" } ?? "-"]
+                              s.inlineBoxWidth.map { "\($0)" } ?? "-",
+                              s.contentRule.map { framed($0.id) } ?? "-"]
                 }
                 if let b = ext.block {
                     parts += ["b", framed(b.fence)]
