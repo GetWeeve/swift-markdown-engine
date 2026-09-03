@@ -25,8 +25,11 @@ import AppKit
 enum MarkdownPasteboardWriter {
     /// Private flavor carrying the raw markdown of the selection. When one of
     /// our own editors pastes, it prefers this over the derived HTML so wiki
-    /// links (`[[Name|UUID]]`), code, and every other construct round-trip
-    /// byte-exact instead of being re-derived from the lossy HTML flavor.
+    /// links (`[[Name|UUID]]`), code, and every construct the plain-text
+    /// renderer keeps round-trip byte-exact instead of being re-derived from
+    /// the lossy HTML flavor. A construct an extension omits from plain text
+    /// is gone from this flavor too, by design: it must not leave the app, and
+    /// this flavor does leave it.
     static let markdownType = NSPasteboard.PasteboardType("dev.markdownengine.raw-markdown")
 
     /// Safari's flavor, which has no AppKit constant.
