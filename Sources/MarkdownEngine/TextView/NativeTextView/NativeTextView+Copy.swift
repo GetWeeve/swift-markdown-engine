@@ -10,10 +10,14 @@
 //  `MarkdownPasteboardWriter`, which renders a clean HTML/RTF/web-archive set
 //  and keeps the raw markdown as the plain-text flavor.
 //
+//  Cut needs nothing of its own: AppKit's `cut(_:)` copies through this
+//  override and then deletes.
+//
 //  A drag is the copy path that does not pass through here: it writes the
-//  selection to its own pasteboard, never to `NSPasteboard.general`. The
-//  `writeSelection` override below is the seam it shares with the services
-//  menu, and it gives the text flavor the same treatment a copy gets.
+//  selection to its own pasteboard, never to `NSPasteboard.general`, and it
+//  asks for one type at a time. The `writeSelection` override below is the
+//  seam it shares with the services menu, and it hands every flavor we derive
+//  to the same writer a copy uses.
 //
 
 import AppKit
@@ -29,27 +33,23 @@ extension NativeTextView {
         MarkdownPasteboardWriter.write(markdown: raw, to: .general, extensions: configuration.extensions)
     }
 
-    /// Only the text flavor is ours to correct here; the rest of what a drag
-    /// carries stays AppKit's own serialization of the selection, RTFD
-    /// attachments included.
+    /// A selection dragged out, or taken by a service, is serialized here. A
+    /// text view offers plain text and RTF (and RTFD when the selection
+    /// carries an attachment), and AppKit would derive all of them from the
+    /// storage — which is styled RAW markdown, so both the syntax markers and
+    /// the constructs an extension omits would ride out with it. Every flavor
+    /// the writer derives is therefore ours; RTFD stays AppKit's, which is
+    /// what keeps a dragged image an image.
     override func writeSelection(to pboard: NSPasteboard, type: NSPasteboard.PasteboardType) -> Bool {
-        guard type == .string, let text = exportedSelectionText() else {
+        let selection = selectedRange()
+        guard selection.length > 0 else {
             return super.writeSelection(to: pboard, type: type)
         }
-        return pboard.setString(text, forType: .string)
-    }
-
-    /// The selected raw markdown as it may leave the app, or nil when there is
-    /// no selection to write.
-    ///
-    /// The text flavor is written from the storage either way rather than only
-    /// when a construct needs omitting: storage is the raw markdown, so this is
-    /// what AppKit would serialize anyway, and one path is easier to trust than
-    /// two.
-    private func exportedSelectionText() -> String? {
-        let selection = selectedRange()
-        guard selection.length > 0 else { return nil }
         let raw = (string as NSString).substring(with: selection)
-        return MarkdownPlainTextRenderer.plainText(from: raw, extensions: configuration.extensions)
+        if MarkdownPasteboardWriter.write(markdown: raw, forType: type, to: pboard,
+                                          extensions: configuration.extensions) {
+            return true
+        }
+        return super.writeSelection(to: pboard, type: type)
     }
 }
