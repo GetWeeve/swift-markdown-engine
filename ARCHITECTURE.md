@@ -78,9 +78,11 @@ re-parses one block, not the whole document (≈ O(edit)).
 `==highlight==`), a fenced block form (`BlockSyntax`, e.g. `::: … :::`), or
 both — plus content attributes and an HTML wrapper for the clean-copy path.
 Registered via `MarkdownEditorConfiguration.extensions`; unregistered syntax
-stays literal text. Extensions never emit ranges — the parser derives all
-geometry — and every parse cache keys on the registry fingerprint, so the
-registered set can change at runtime.
+stays literal text. An `InlineSyntax.contentRule` narrows a span to the content
+the extension can handle, so delimiters looser than the construct can decline a
+candidate and leave it literal. Extensions never emit ranges — the parser
+derives all geometry — and every parse cache keys on the registry fingerprint,
+so the registered set can change at runtime.
 
 **Invariant:** built-in constructs always classify first; an extension can
 never take text away from core markdown.

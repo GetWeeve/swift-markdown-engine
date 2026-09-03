@@ -57,6 +57,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the editor's window isn't key.
 
 ### Added
+- `InlineSyntax.contentRule` — an extension's own acceptance test for a
+  candidate span's content, so a syntax looser than its construct can decline
+  what it cannot handle. `[t=` … `]` matches `[t=hello]` as readily as
+  `[t=12.0-19.5]`; a rejected candidate stays literal text and the scan
+  continues, instead of being claimed and (for a boxed span) laid out as blank
+  line space over characters that stay invisible. Default nil, so every
+  existing extension parses exactly as before.
 - `ListStyle.taskShorthandEnabled` (default `false`): typing a space when the
   line so far reads `[]`, `[ ]`, or `- []` (after optional leading indent)
   rewrites that prefix into an unchecked `- [ ] ` task item, keeping the

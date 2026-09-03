@@ -270,6 +270,15 @@ enum InlineParser {
                 if entry.syntax.requiresNonEmptyContent, k == contentStart { return nil }
                 if entry.syntax.rejectsCloserRun,
                    let after = peek(ns, k + close.count, len), after == close[close.count - 1] { return nil }
+                // Last, because it is the only check that has to build a
+                // String: the extension's own say over content its delimiters
+                // match but its construct does not cover. Declining leaves the
+                // candidate literal, so the scan carries on from the next
+                // character and the text stays visible.
+                if let rule = entry.syntax.contentRule,
+                   !rule.accepts(ns.substring(with: NSRange(location: contentStart, length: k - contentStart))) {
+                    return nil
+                }
                 return .ext(
                     id: entry.id,
                     range: NSRange(location: i, length: (k + close.count) - i),
