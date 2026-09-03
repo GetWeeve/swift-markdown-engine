@@ -24,16 +24,25 @@ public enum MarkdownPlainTextRenderer {
     /// syntax stays literal, as it does everywhere else in the engine.
     public static func plainText(from markdown: String, extensions: [any MarkdownExtension] = []) -> String {
         guard extensions.isEmpty == false else { return markdown }
-        var byID: [String: any MarkdownExtension] = [:]
-        for ext in extensions { byID[ext.id] = ext }
-
-        let ns = markdown as NSString
+        let env = Env(ns: markdown as NSString,
+                      byID: {
+                          var out: [String: any MarkdownExtension] = [:]
+                          for ext in extensions { out[ext.id] = ext }
+                          return out
+                      }())
         var edits: [Edit] = []
         for block in DocumentAST.parse(markdown, registry: ExtensionRegistry(extensions: extensions)) {
-            collect(block, ns: ns, byID: byID, into: &edits)
+            collect(block, env: env, into: &edits)
         }
         guard edits.isEmpty == false else { return markdown }
         return applying(edits, to: markdown)
+    }
+
+    /// The document and the extension lookup, threaded through the walk — the
+    /// same shape `MarkdownHTMLRenderer` threads through its own.
+    private struct Env {
+        let ns: NSString
+        let byID: [String: any MarkdownExtension]
     }
 
     /// One extension construct and what takes its place. Ranges are absolute
@@ -45,32 +54,27 @@ public enum MarkdownPlainTextRenderer {
 
     // MARK: - Blocks
 
-    private static func collect(_ node: BlockNode, ns: NSString,
-                                byID: [String: any MarkdownExtension], into edits: inout [Edit]) {
+    private static func collect(_ node: BlockNode, env: Env, into edits: inout [Edit]) {
         switch node {
         case .paragraph(_, let inlines),
              .heading(_, _, _, let inlines),
              .blockquote(_, let inlines):
-            collect(inlines, ns: ns, byID: byID, into: &edits)
+            collect(inlines, env: env, into: &edits)
 
         case .list(_, let items):
             for item in items {
-                collect(item.inlines, ns: ns, byID: byID, into: &edits)
+                collect(item.inlines, env: env, into: &edits)
             }
 
         case .ext(let node):
-            let source = ns.substring(with: node.range)
-            guard let ext = byID[node.extensionID] else { return }
-            let replacement = ext.plainText(
-                source: source,
-                childrenText: content(node.inlines, over: node.contentRange, ns: ns, byID: byID)
-            )
-            guard replacement != source else {
+            guard let edit = edit(forExtension: node.extensionID, range: node.range,
+                                  contentRange: node.contentRange, children: node.inlines, env: env)
+            else {
                 // Kept verbatim, so the constructs inside it still get a say.
-                collect(node.inlines, ns: ns, byID: byID, into: &edits)
+                collect(node.inlines, env: env, into: &edits)
                 return
             }
-            edits.append(Edit(range: node.range, text: replacement))
+            edits.append(edit)
 
         // Nothing an extension can claim: code, formulas, and tables are
         // opaque to the inline parser, and the rest carries no inlines.
@@ -81,25 +85,20 @@ public enum MarkdownPlainTextRenderer {
 
     // MARK: - Inlines
 
-    private static func collect(_ nodes: [InlineNode], ns: NSString,
-                                byID: [String: any MarkdownExtension], into edits: inout [Edit]) {
+    private static func collect(_ nodes: [InlineNode], env: Env, into edits: inout [Edit]) {
         for node in nodes {
             switch node {
             case .emphasis(_, _, _, let children), .link(_, _, _, _, let children):
-                collect(children, ns: ns, byID: byID, into: &edits)
+                collect(children, env: env, into: &edits)
 
             case .ext(let node):
-                let source = ns.substring(with: node.range)
-                guard let ext = byID[node.extensionID] else { continue }
-                let replacement = ext.plainText(
-                    source: source,
-                    childrenText: content(node.children, over: node.contentRange, ns: ns, byID: byID)
-                )
-                guard replacement != source else {
-                    collect(node.children, ns: ns, byID: byID, into: &edits)
+                guard let edit = edit(forExtension: node.extensionID, range: node.range,
+                                      contentRange: node.contentRange, children: node.children, env: env)
+                else {
+                    collect(node.children, env: env, into: &edits)
                     continue
                 }
-                edits.append(Edit(range: node.range, text: replacement))
+                edits.append(edit)
 
             case .text, .code, .image, .wikiLink, .imageEmbed, .inlineLatex, .escape:
                 continue
@@ -107,14 +106,29 @@ public enum MarkdownPlainTextRenderer {
         }
     }
 
+    /// What replaces one extension construct, or nil when the construct stays
+    /// as written — because its extension is not registered, or because its
+    /// `plainText` handed back the source it was given. A nil is the caller's
+    /// cue to walk into the construct instead of replacing it.
+    private static func edit(forExtension id: String, range: NSRange, contentRange: NSRange,
+                             children: [InlineNode], env: Env) -> Edit? {
+        guard let ext = env.byID[id] else { return nil }
+        let source = env.ns.substring(with: range)
+        let replacement = ext.plainText(
+            source: source,
+            childrenText: content(children, over: contentRange, env: env)
+        )
+        guard replacement != source else { return nil }
+        return Edit(range: range, text: replacement)
+    }
+
     /// A construct's content with the constructs nested inside it already
     /// resolved, which is what an extension is handed as `childrenText`.
-    private static func content(_ children: [InlineNode], over range: NSRange, ns: NSString,
-                                byID: [String: any MarkdownExtension]) -> String {
-        let source = ns.substring(with: range)
+    private static func content(_ children: [InlineNode], over range: NSRange, env: Env) -> String {
+        let source = env.ns.substring(with: range)
         guard children.isEmpty == false else { return source }
         var nested: [Edit] = []
-        collect(children, ns: ns, byID: byID, into: &nested)
+        collect(children, env: env, into: &nested)
         // Children sit inside `range`, so shifting their ranges puts them in
         // the coordinate space of the content substring.
         return applying(
