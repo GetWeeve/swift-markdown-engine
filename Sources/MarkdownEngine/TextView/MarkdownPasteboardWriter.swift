@@ -11,10 +11,13 @@
 //  derive RTF with visible stand-ins for constructs RTF cannot carry, and
 //  keep the raw markdown itself as the plain-text flavor.
 //
-//  This is the one funnel every copy path passes through, so it is also where
-//  the text flavors go through `MarkdownPlainTextRenderer`: a construct an
-//  extension omits from plain text must not reach the pasteboard on any
-//  flavor.
+//  Every flavor is derived from the same pass, and the text ones run through
+//  `MarkdownPlainTextRenderer`, so a construct an extension omits from plain
+//  text reaches the pasteboard on no flavor at all.
+//
+//  Two callers, two shapes: `copy(_:)` hands over a pasteboard of its own and
+//  takes the whole set, while a drag and the services menu ask for the
+//  selection one type at a time — `write(markdown:forType:to:extensions:)`.
 //
 
 import AppKit
@@ -26,59 +29,147 @@ enum MarkdownPasteboardWriter {
     /// byte-exact instead of being re-derived from the lossy HTML flavor.
     static let markdownType = NSPasteboard.PasteboardType("dev.markdownengine.raw-markdown")
 
+    /// Safari's flavor, which has no AppKit constant.
+    static let webArchiveType = NSPasteboard.PasteboardType("com.apple.webarchive")
+
+    /// What a text view still calls plain text and RTF in
+    /// `writablePasteboardTypes` — the list a drag and the services menu ask
+    /// from, one type at a time. These are NOT equal to `.string` and `.rtf`,
+    /// so a writer that matched only the UTIs would hand every real drag
+    /// straight back to AppKit.
+    static let legacyStringType = NSPasteboard.PasteboardType("NSStringPboardType")
+    static let legacyRTFType = NSPasteboard.PasteboardType("NeXT Rich Text Format v1.0 pasteboard type")
+
+    /// Every flavor this writer derives from one selection, rendered together:
+    /// a caller that wants several does not pay for the HTML render and the
+    /// RTF conversion once per flavor.
+    struct Flavors {
+        /// The plain-text flavor, and the private raw-markdown one.
+        let text: String
+        let html: Data
+        let webArchive: Data?
+        let rtf: Data?
+    }
+
     @MainActor
     static func write(markdown: String, to pasteboard: NSPasteboard,
                       extensions: [any MarkdownExtension] = []) {
+        let flavors = flavors(markdown: markdown, extensions: extensions)
         pasteboard.clearContents()
 
-        // The raw markdown, minus the constructs their extensions omit from
-        // plain text. Markdown outside such a construct is untouched, so the
-        // private flavor below still round-trips byte-exact.
+        // The raw markdown as plain text, and under our private flavor so our
+        // own paste path can round-trip it.
+        pasteboard.setString(flavors.text, forType: .string)
+        pasteboard.setString(flavors.text, forType: Self.markdownType)
+
+        // Web archive built straight from OUR html — deriving it from
+        // NSAttributedString(html:) silently dropped <hr>, so WebKit-reading
+        // consumers get the real document instead.
+        if let webArchive = flavors.webArchive {
+            pasteboard.setData(webArchive, forType: Self.webArchiveType)
+        }
+        pasteboard.setData(flavors.html, forType: .html)
+        if let rtf = flavors.rtf {
+            pasteboard.setData(rtf, forType: .rtf)
+        }
+    }
+
+    /// Writes one flavor onto a pasteboard the caller owns and has already
+    /// declared types on, for the paths that ask for the selection a type at a
+    /// time: a drag, and the services menu.
+    ///
+    /// False means this writer has no flavor of its own for `type` — the
+    /// caller's cue to let AppKit serialize that one. RTFD is the type that
+    /// matters there: a text view offers it only when the selection carries an
+    /// attachment, and AppKit's own serialization is what keeps a dragged
+    /// image an image.
+    @MainActor
+    static func write(markdown: String, forType type: NSPasteboard.PasteboardType,
+                      to pasteboard: NSPasteboard, extensions: [any MarkdownExtension] = []) -> Bool {
+        guard let flavor = flavor(for: type) else { return false }
+        // Written back under the type the caller asked for, whichever spelling
+        // that was: the pasteboard was declared with that one.
+        let flavors = flavors(markdown: markdown, extensions: extensions)
+        switch flavor {
+        case .text:
+            return pasteboard.setString(flavors.text, forType: type)
+        case .html:
+            return pasteboard.setData(flavors.html, forType: type)
+        case .webArchive:
+            return flavors.webArchive.map { pasteboard.setData($0, forType: type) } ?? false
+        case .rtf:
+            return flavors.rtf.map { pasteboard.setData($0, forType: type) } ?? false
+        }
+    }
+
+    /// One of the flavors this writer renders.
+    enum Flavor: Equatable {
+        case text
+        case html
+        case webArchive
+        case rtf
+    }
+
+    /// Which flavor a pasteboard type asks for, or nil when this writer
+    /// derives none — RTFD, which a text view offers only for a selection
+    /// carrying an attachment and which AppKit serializes better than we
+    /// could. Both the UTI and the legacy name map here.
+    static func flavor(for type: NSPasteboard.PasteboardType) -> Flavor? {
+        switch type {
+        case .string, Self.markdownType, Self.legacyStringType: .text
+        case .html: .html
+        case Self.webArchiveType: .webArchive
+        case .rtf, Self.legacyRTFType: .rtf
+        default: nil
+        }
+    }
+
+    /// Renders the selection once into every flavor.
+    @MainActor
+    static func flavors(markdown: String, extensions: [any MarkdownExtension] = []) -> Flavors {
+        // Plain text keeps the raw markdown, minus the constructs their
+        // extensions omit from it. Markdown outside such a construct is
+        // untouched, so the private flavor still round-trips byte-exact.
         let text = MarkdownPlainTextRenderer.plainText(from: markdown, extensions: extensions)
-
-        // Always keep the raw markdown available as plain text.
-        pasteboard.setString(text, forType: .string)
-
-        // Also keep it under our private flavor so our own paste path can
-        // round-trip it losslessly.
-        pasteboard.setString(text, forType: Self.markdownType)
 
         // Render the selection to clean HTML.
         let htmlBody = MarkdownHTMLRenderer.html(from: markdown, extensions: extensions)
         // Rich targets (web archive + RTF) show task items as plain bullets
-        // (user's call); the .html flavor keeps the GFM checkbox markup so
+        // (user's call); the .html flavour keeps the GFM checkbox markup so
         // markdown apps (Obsidian etc.) restore `- [ ]` on paste.
         let richBody = stripTaskCheckboxes(htmlBody)
         let fullHTML = "<html><head><meta charset=\"utf-8\"></head><body>\(htmlBody)</body></html>"
         let richHTML = "<html><head><meta charset=\"utf-8\"></head><body>\(richBody)</body></html>"
 
-        // Web archive built straight from OUR html — deriving it from
-        // NSAttributedString(html:) silently dropped <hr>, so WebKit-reading
-        // consumers get the real document instead.
-        if let web = webArchiveData(html: richHTML) {
-            pasteboard.setData(web, forType: NSPasteboard.PasteboardType("com.apple.webarchive"))
-        }
-        pasteboard.setData(Data(fullHTML.utf8), forType: .html)
+        return Flavors(
+            text: text,
+            html: Data(fullHTML.utf8),
+            webArchive: webArchiveData(html: richHTML),
+            rtf: rtfData(body: rtfFallbackBody(richBody))
+        )
+    }
 
-        // RTF for consumers without web-archive support. RTF has no horizontal
-        // rule and the HTML importer drops it, so convert a body with a
-        // visible ─ stand-in on the main thread.
-        let rtfHTML = "<html><head><meta charset=\"utf-8\"></head><body>\(rtfFallbackBody(richBody))</body></html>"
-        if let data = rtfHTML.data(using: .utf8),
-           let attr = try? NSAttributedString(
-               data: data,
-               options: [
-                   .documentType: NSAttributedString.DocumentType.html,
-                   .characterEncoding: String.Encoding.utf8.rawValue,
-               ],
-               documentAttributes: nil
-           ),
-           let rtf = try? attr.data(
-               from: NSRange(location: 0, length: attr.length),
-               documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
-           ) {
-            pasteboard.setData(rtf, forType: .rtf)
-        }
+    /// RTF for consumers without web-archive support — which is what a drag
+    /// into a rich-text app takes. RTF has no horizontal rule and the HTML
+    /// importer drops it, so the body arrives with a visible ─ stand-in, and
+    /// the conversion runs on the main thread.
+    @MainActor
+    private static func rtfData(body: String) -> Data? {
+        let html = "<html><head><meta charset=\"utf-8\"></head><body>\(body)</body></html>"
+        guard let data = html.data(using: .utf8),
+              let attributed = try? NSAttributedString(
+                  data: data,
+                  options: [
+                      .documentType: NSAttributedString.DocumentType.html,
+                      .characterEncoding: String.Encoding.utf8.rawValue,
+                  ],
+                  documentAttributes: nil
+              )
+        else { return nil }
+        return try? attributed.data(
+            from: NSRange(location: 0, length: attributed.length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
+        )
     }
 
     /// Stand-in for what RTF can't carry: the Cocoa HTML importer drops `<hr>`,

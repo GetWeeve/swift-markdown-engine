@@ -20,12 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - A drag of the selection, and the services menu, no longer serialize the
-  storage's raw markdown straight out of the text view. Both write through
-  `writeSelection(to:type:)`, which never reached
-  `MarkdownPasteboardWriter`, so an extension's omitted construct left the app
-  on the text flavor of a drag even though a copy was clean. The text flavor
-  now goes through the same renderer a copy does; every other flavor of a drag
-  stays AppKit's own.
+  storage's styled raw markdown straight out of the text view. Both ask for
+  the selection one type at a time through `writeSelection(to:type:)`, which
+  never reached `MarkdownPasteboardWriter`, so syntax markers and an
+  extension's omitted constructs left the app on both flavors a text view
+  offers — plain text and RTF, the one a rich-text app takes on a drop. Both
+  now come from the writer, which derives every flavor of a selection in one
+  pass (`flavors(markdown:extensions:)`). RTFD is deliberately still AppKit's:
+  a text view offers it only for a selection carrying an attachment, and
+  AppKit's serialization is what keeps a dragged image an image.
+  Note for anyone overriding this seam: `writablePasteboardTypes` answers with
+  the LEGACY pasteboard names (`NSStringPboardType`, `NeXT Rich Text Format
+  v1.0 pasteboard type`), which are not equal to `.string` and `.rtf`, so
+  `MarkdownPasteboardWriter.flavor(for:)` maps both spellings.
 - Empty grid-hidden task lines (`- [ ] ` with no content) no longer park the
   text baseline at the fragment bottom. Collapsing every marker glyph to the
   0.1pt inline-marker font left the line without a body-font strut, so the
