@@ -76,7 +76,10 @@ re-parses one block, not the whole document (≈ O(edit)).
 
 `MarkdownExtension` contributes an inline span form (`InlineSyntax`, e.g.
 `==highlight==`), a fenced block form (`BlockSyntax`, e.g. `::: … :::`), or
-both — plus content attributes and an HTML wrapper for the clean-copy path.
+both — plus content attributes, an HTML wrapper for the clean-copy path, and
+the construct's form in the plain-text copy flavors (`plainText(source:
+childrenText:)`, which keeps the construct verbatim unless the extension says
+otherwise).
 Registered via `MarkdownEditorConfiguration.extensions`; unregistered syntax
 stays literal text. An `InlineSyntax.contentRule` narrows a span to the content
 the extension can handle, so delimiters looser than the construct can decline a

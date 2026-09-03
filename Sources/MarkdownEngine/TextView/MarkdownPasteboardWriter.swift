@@ -11,12 +11,17 @@
 //  derive RTF with visible stand-ins for constructs RTF cannot carry, and
 //  keep the raw markdown itself as the plain-text flavor.
 //
+//  This is the one funnel every copy path passes through, so it is also where
+//  the text flavors go through `MarkdownPlainTextRenderer`: a construct an
+//  extension omits from plain text must not reach the pasteboard on any
+//  flavor.
+//
 
 import AppKit
 
 enum MarkdownPasteboardWriter {
-    /// Private flavor carrying the exact raw markdown of the selection. When one
-    /// of our own editors pastes, it prefers this over the derived HTML so wiki
+    /// Private flavor carrying the raw markdown of the selection. When one of
+    /// our own editors pastes, it prefers this over the derived HTML so wiki
     /// links (`[[Name|UUID]]`), code, and every other construct round-trip
     /// byte-exact instead of being re-derived from the lossy HTML flavor.
     static let markdownType = NSPasteboard.PasteboardType("dev.markdownengine.raw-markdown")
@@ -26,12 +31,17 @@ enum MarkdownPasteboardWriter {
                       extensions: [any MarkdownExtension] = []) {
         pasteboard.clearContents()
 
-        // Always keep the raw markdown available as plain text.
-        pasteboard.setString(markdown, forType: .string)
+        // The raw markdown, minus the constructs their extensions omit from
+        // plain text. Markdown outside such a construct is untouched, so the
+        // private flavor below still round-trips byte-exact.
+        let text = MarkdownPlainTextRenderer.plainText(from: markdown, extensions: extensions)
 
-        // Also keep the exact raw markdown under our private flavor so our own
-        // paste path can round-trip it losslessly.
-        pasteboard.setString(markdown, forType: Self.markdownType)
+        // Always keep the raw markdown available as plain text.
+        pasteboard.setString(text, forType: .string)
+
+        // Also keep it under our private flavor so our own paste path can
+        // round-trip it losslessly.
+        pasteboard.setString(text, forType: Self.markdownType)
 
         // Render the selection to clean HTML.
         let htmlBody = MarkdownHTMLRenderer.html(from: markdown, extensions: extensions)

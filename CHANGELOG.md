@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `MarkdownExtension.plainText(source:childrenText:)`: the plain-text
+  counterpart of `html(childrenHTML:)`, applied to the `.string` and
+  `dev.markdownengine.raw-markdown` flavors by the new
+  `MarkdownPlainTextRenderer`. It defaults to the construct's own markdown, so
+  a registered extension copies exactly as it did before; returning `""` omits
+  a construct that has no glyphs on screen (a span laid out as an
+  `inlineBoxWidth` control, a comment) from the text leaving the app.
+  Everything outside such a construct is copied verbatim, so the private
+  raw-markdown flavor still round-trips byte-exact.
+
 ### Fixed
+- A drag of the selection, and the services menu, no longer serialize the
+  storage's raw markdown straight out of the text view. Both write through
+  `writeSelection(to:type:)`, which never reached
+  `MarkdownPasteboardWriter`, so an extension's omitted construct left the app
+  on the text flavor of a drag even though a copy was clean. The text flavor
+  now goes through the same renderer a copy does; every other flavor of a drag
+  stays AppKit's own.
 - Empty grid-hidden task lines (`- [ ] ` with no content) no longer park the
   text baseline at the fragment bottom. Collapsing every marker glyph to the
   0.1pt inline-marker font left the line without a body-font strut, so the
