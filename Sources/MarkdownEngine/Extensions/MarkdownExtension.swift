@@ -141,6 +141,16 @@ public protocol MarkdownExtension: Sendable {
     /// Wrap the rendered inner HTML for the clean-copy path
     /// (`childrenHTML` is already escaped / recursively rendered).
     func html(childrenHTML: String) -> String
+    /// The construct's form in the plain-text and raw-markdown copy flavors.
+    /// `source` is the construct's own markdown, delimiters included;
+    /// `childrenText` is its content with nested constructs already resolved.
+    ///
+    /// The default returns `source`, so registering an extension never changes
+    /// what a copy carries. Return "" for a construct that is invisible on
+    /// screen — a control laid out as an inline box, a comment — which is the
+    /// counterpart of `html(childrenHTML:)` returning "": otherwise the
+    /// delimiters appear the moment the selection leaves the app.
+    func plainText(source: String, childrenText: String) -> String
 }
 
 public extension MarkdownExtension {
@@ -150,6 +160,7 @@ public extension MarkdownExtension {
     // first.
     var inline: InlineSyntax? { nil }
     var block: BlockSyntax? { nil }
+    func plainText(source: String, childrenText _: String) -> String { source }
 }
 
 // MARK: - Parser-facing registry (internal)
