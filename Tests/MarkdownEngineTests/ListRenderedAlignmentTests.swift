@@ -57,6 +57,15 @@ struct ListPaddingParsingTests {
         #expect((item.checkbox != nil) == prefix.contains("["))
     }
 
+    @Test(arguments: ["-     [ ] literal", "-\t  [ ] literal", "1.     [x] literal", "- \tword", "-\t word", "1. \tword"])
+    func preservesContentIndentBeyondMarkerPadding(text: String) throws {
+        let block = try #require(DocumentAST.parse(text).first)
+        guard case let .list(_, items) = block else { Issue.record("Expected list"); return }
+        let item = try #require(items.first)
+        #expect(item.checkbox == nil)
+        #expect(item.contentRange.location == NSMaxRange(item.marker) + 1)
+    }
+
     @Test func preservesNestedIndentAndWhitespaceInCode() throws {
         let text = "*   Parent\n    *   Child\n\n```text\n*   Keep source spaces\n```\n"
         let blocks = DocumentAST.parse(text)
