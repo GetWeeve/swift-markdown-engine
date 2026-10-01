@@ -57,6 +57,8 @@ public final class NativeTextViewCoordinator: NSObject, NSTextViewDelegate {
     var lastImageFingerprint: AnyHashable?
     var lastWikiFingerprint: AnyHashable?
     private var busObservers: [NSObjectProtocol] = []
+    /// Clip view observers; see `installViewportObservers`.
+    var viewportObservers: [NSObjectProtocol] = []
     private var registeredAppearanceObserverName: Notification.Name?
     weak var textView: NSTextView?
     /// Owns the scroll-away header (build, content refresh, collapse/expand,
@@ -299,12 +301,18 @@ public final class NativeTextViewCoordinator: NSObject, NSTextViewDelegate {
         registeredAppearanceObserverName = name
     }
 
+    /// Drops the bus subscriptions, on a configuration swap or when the
+    /// editor goes away.
+    func removeBusObservers() {
+        busObservers.forEach(NotificationCenter.default.removeObserver(_:))
+        busObservers.removeAll(keepingCapacity: true)
+    }
+
     /// Subscribe to whichever bus notification names the current configuration
     /// supplies. Removes any previous subscriptions first so that swapping
     /// configurations at runtime doesn't double-fire handlers.
     private func subscribeToBusNotifications(replacing previous: MarkdownEditorBus) {
-        busObservers.forEach(NotificationCenter.default.removeObserver(_:))
-        busObservers.removeAll(keepingCapacity: true)
+        removeBusObservers()
 
         let bus = configuration.services.bus
         let center = NotificationCenter.default
