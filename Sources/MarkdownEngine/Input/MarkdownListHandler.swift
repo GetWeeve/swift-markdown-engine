@@ -33,6 +33,12 @@ struct MarkdownLists {
         guard textView.shouldChangeText(in: safeRange, replacementString: string) else { return }
         textView.textStorage?.replaceCharacters(in: safeRange, with: string)
         textView.didChangeText()
+        // `insertText` reveals the caret as part of AppKit's post-edit
+        // processing. This path replaces storage directly, so a newly
+        // continued list/quote line at the bottom of a small viewport would
+        // otherwise stay clipped until the next real keystroke (the first
+        // content character on that empty item).
+        textView.scrollRangeToVisible(textView.selectedRange())
     }
 
     // Markers: `-`/`*`/`+` (raw Markdown) + legacy `•` (rendered, never typed).

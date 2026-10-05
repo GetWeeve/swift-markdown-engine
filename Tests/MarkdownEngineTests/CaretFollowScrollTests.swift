@@ -15,6 +15,7 @@
 //
 
 import AppKit
+import SwiftUI
 import Testing
 @testable import MarkdownEngine
 
@@ -120,5 +121,134 @@ struct CaretFollowScrollTests {
         let realHeight = container?.scrollableContentHeight ?? 0
         let maxY = max(-stack.scrollView.contentInsets.top, realHeight - cv.bounds.height)
         #expect(cv.bounds.origin.y <= maxY + 0.5)
+    }
+
+    // MARK: - Empty list continuation
+
+    /// List Enter is intercepted and applied via `performEdit` (storage replace
+    /// + `didChangeText`), which skips `NSTextView.insertText` and therefore
+    /// skips AppKit's post-insert `scrollRangeToVisible`. A new marker-only
+    /// item (`- `, `1. `, `- [ ] `) at the bottom of a small viewport must
+    /// still reveal its full line — not wait until the first content character.
+    @Test("Enter on a list item at the bottom reveals the new empty item")
+    func emptyListContinuationScrollsFullyIntoView() {
+        let stack = makeListStack(items: 30, lastContent: "last item")
+        let tv = stack.textView
+        let cv = stack.scrollView.contentView
+
+        let beforeEnter = (tv.string as NSString).length
+        tv.setSelectedRange(NSRange(location: beforeEnter, length: 0))
+        tv.scrollRangeToVisible(NSRange(location: beforeEnter, length: 0))
+        let yBefore = cv.bounds.origin.y
+        #expect(yBefore > 0)
+
+        tv.insertText("\n", replacementRange: NSRange(location: beforeEnter, length: 0))
+        #expect(tv.string.hasSuffix("\n- "))
+
+        let caret = tv.selectedRange()
+        #expect(caret.length == 0)
+        #expect(caret.location == (tv.string as NSString).length)
+
+        let line = lineRect(in: tv, at: max(caret.location - 1, 0))
+        #expect(line.height > 0, "empty list item has no line fragment")
+        #expect(line.maxY <= cv.bounds.origin.y + cv.bounds.height + 0.5)
+        #expect(line.minY >= cv.bounds.origin.y - 0.5)
+        #expect(cv.bounds.origin.y >= yBefore, "viewport should not jump upward")
+    }
+
+    @Test("revealing a marker-only last line uses the full line height")
+    func emptyListItemRevealMatchesLineHeight() {
+        let stack = makeListStack(items: 30, lastContent: "")
+        let tv = stack.textView
+        let cv = stack.scrollView.contentView
+        #expect(tv.string.hasSuffix("\n- "))
+
+        let end = (tv.string as NSString).length
+        tv.setSelectedRange(NSRange(location: end, length: 0))
+        tv.scrollRangeToVisible(NSRange(location: end, length: 0))
+
+        let line = lineRect(in: tv, at: max(end - 1, 0))
+        #expect(line.height > 0)
+        #expect(line.maxY <= cv.bounds.origin.y + cv.bounds.height + 0.5)
+        #expect(line.minY >= cv.bounds.origin.y - 0.5)
+    }
+
+    // MARK: - List helpers
+
+    private struct ListScrollStack {
+        let scrollView: ClampedScrollView
+        let textView: NativeTextView
+        let coordinator: NativeTextViewCoordinator
+        let layoutBridge: LayoutBridge?
+    }
+
+    private func makeListStack(items: Int, lastContent: String) -> ListScrollStack {
+        _ = NSApplication.shared
+        let viewport = NSSize(width: 360, height: 120)
+        let stack = HeightBehaviorStack(viewport: viewport, heightBehavior: .scrolls)
+        let tv = stack.textView
+        var config = tv.configuration
+        config.lists = ListStyle(
+            indentPerLevel: 24,
+            extraLineHeight: 2,
+            markerTextGap: 16,
+            markerSlotWidth: 20
+        )
+        tv.configuration = config
+
+        let body = (1..<items).map { "- line number \($0)" }
+        let last = lastContent.isEmpty ? "- " : "- \(lastContent)"
+        let text = (body + [last]).joined(separator: "\n")
+
+        let coordinator = NativeTextViewCoordinator(
+            text: .constant(text),
+            fontName: NSFont.systemFont(ofSize: 16).fontName,
+            fontSize: 16,
+            isWikiLinkActive: .constant(false),
+            onLinkClick: nil,
+            onInlineSelectionChange: nil
+        )
+        coordinator.configuration = config
+        coordinator.textView = tv
+        tv.delegate = coordinator
+        var bridge: LayoutBridge?
+        if let tlm = tv.textLayoutManager {
+            bridge = LayoutBridge(tlm)
+            tv.layoutBridge = bridge
+            coordinator.layoutBridge = bridge
+        }
+        coordinator.rebuildTextStorageAndStyle(tv, from: text)
+        tv.recalcOverscroll(for: stack.scrollView)
+        stack.scrollView.layoutSubtreeIfNeeded()
+        return ListScrollStack(
+            scrollView: stack.scrollView,
+            textView: tv,
+            coordinator: coordinator,
+            layoutBridge: bridge
+        )
+    }
+
+    /// Typographic bounds of the text line containing `offset`, in document-view
+    /// coordinates (text-view frame origin applied), matching the reveal math.
+    private func lineRect(in tv: NativeTextView, at offset: Int) -> CGRect {
+        guard let tlm = tv.textLayoutManager,
+              let loc = tlm.textContentManager?.location(
+                  tlm.documentRange.location, offsetBy: offset
+              )
+        else { return .zero }
+        var rect = CGRect.zero
+        tlm.enumerateTextLayoutFragments(from: loc, options: [.ensuresLayout]) { fragment in
+            guard let line = fragment.textLineFragments.last(where: { $0.characterRange.length > 0 })
+                ?? fragment.textLineFragments.last
+            else { return false }
+            rect = CGRect(
+                x: fragment.layoutFragmentFrame.minX + line.typographicBounds.minX,
+                y: fragment.layoutFragmentFrame.minY + line.typographicBounds.minY,
+                width: max(line.typographicBounds.width, 1),
+                height: line.typographicBounds.height
+            )
+            return false
+        }
+        return rect.offsetBy(dx: 0, dy: tv.frame.origin.y)
     }
 }
