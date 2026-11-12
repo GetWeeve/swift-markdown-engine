@@ -23,6 +23,15 @@ final class ClampedScrollView: NSScrollView {
         return NSSize(width: NSView.noIntrinsicMetric, height: container.scrollableContentHeight)
     }
 
+    override func tile() {
+        super.tile()
+        // The placeholder can be installed before the clip view has its final
+        // height. Fill the viewport once it is sized so wrapped lines can draw.
+        if !fitsContent, let textView = nativeTextView, textView.placeholderView?.isHidden == false {
+            textView.applyManagedFrameSize(width: textView.frame.width)
+        }
+    }
+
     override func scrollWheel(with event: NSEvent) {
         if fitsContent {
             // No scrollable range — forward to the responder chain so the

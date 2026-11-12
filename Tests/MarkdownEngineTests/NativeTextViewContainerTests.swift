@@ -78,6 +78,42 @@ struct NativeTextViewContainerTests {
         #expect(stack.container.frame.height == 800)
     }
 
+    @Test(arguments: [CGFloat.zero, 240])
+    func multilinePlaceholderFitsAfterInitialLayout(initialWidth: CGFloat) throws {
+        let stack = makeStack(viewport: NSSize(width: initialWidth, height: 0))
+        let inset: CGFloat = 16
+        let viewportWidth: CGFloat = 240
+        let wrapWidth = viewportWidth - 2 * inset
+        stack.textView.textContainerInset = NSSize(width: inset, height: 0)
+        stack.textView.overscrollPercent = 0
+        stack.textView.minOverscrollPoints = 0
+        stack.textView.maxOverscrollPoints = 0
+        stack.textView.recalcOverscroll(for: stack.scrollView)
+        let text = NSAttributedString(
+            string: "This placeholder spans several lines in a narrow editor. Every line should be visible when the editor opens.",
+            attributes: [.font: NSFont.systemFont(ofSize: 16)]
+        )
+        stack.textView.setPlaceholder(text)
+        let placeholder = try #require(stack.textView.placeholderView)
+        let wrappedHeight = text.boundingRect(
+            with: NSSize(width: wrapWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading]
+        ).height
+        try #require(placeholder.bounds.height < wrappedHeight)
+
+        stack.scrollView.setFrameSize(NSSize(width: viewportWidth, height: 180))
+        stack.scrollView.layoutSubtreeIfNeeded()
+
+        #expect(placeholder.frame.minX == inset)
+        #expect(placeholder.bounds.width == wrapWidth)
+        #expect(placeholder.bounds.height >= wrappedHeight)
+
+        stack.scrollView.setFrameSize(NSSize(width: viewportWidth + 80, height: 180))
+        stack.scrollView.layoutSubtreeIfNeeded()
+
+        #expect(placeholder.bounds.width == wrapWidth + 80)
+    }
+
     @Test func scrollableContentHeightComposesHeaderAndContent() {
         let stack = makeStack()
         stack.textView.baseContentHeight = 500

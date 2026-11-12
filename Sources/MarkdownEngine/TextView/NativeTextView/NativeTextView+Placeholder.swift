@@ -25,6 +25,27 @@ final class PlaceholderLabelView: NSView {
     /// Clicks fall through to the text view (focus + caret placement).
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
+    override func resize(withOldSuperviewSize oldSize: NSSize) {
+        updateFrame()
+    }
+
+    func updateFrame() {
+        guard let textView = superview as? NativeTextView else { return }
+        let inset = textView.textContainerInset
+        // Recompute from the editor's bounds. Applying a size delta to a label
+        // created at zero width would lose the horizontal padding.
+        let target = NSRect(
+            x: inset.width,
+            y: inset.height,
+            width: max(textView.bounds.width - inset.width * 2, 0),
+            height: max(textView.bounds.height - inset.height, 0)
+        )
+        if frame != target {
+            frame = target
+            needsDisplay = true
+        }
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         attributedText?.draw(
             with: bounds,
@@ -51,10 +72,7 @@ extension NativeTextView {
                 addSubview(view)
                 placeholderView = view
             }
-            let target = placeholderFrame()
-            if !view.frame.isApproximatelyEqual(to: target) {
-                view.frame = target
-            }
+            view.updateFrame()
         } else if let placeholderView {
             placeholderView.removeFromSuperview()
             self.placeholderView = nil
@@ -78,24 +96,5 @@ extension NativeTextView {
         if placeholderView.isHidden != shouldHide {
             placeholderView.isHidden = shouldHide
         }
-    }
-
-    /// The text container's content area: where TextKit places the first line.
-    private func placeholderFrame() -> NSRect {
-        NSRect(
-            x: textContainerInset.width,
-            y: textContainerInset.height,
-            width: max(bounds.width - textContainerInset.width * 2, 0),
-            height: max(bounds.height - textContainerInset.height, 0)
-        )
-    }
-}
-
-private extension NSRect {
-    func isApproximatelyEqual(to other: NSRect) -> Bool {
-        abs(origin.x - other.origin.x) < 0.5
-            && abs(origin.y - other.origin.y) < 0.5
-            && abs(size.width - other.size.width) < 0.5
-            && abs(size.height - other.size.height) < 0.5
     }
 }
