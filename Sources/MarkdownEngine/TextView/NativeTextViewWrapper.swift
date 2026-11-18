@@ -437,6 +437,8 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         // makeNSView used to write it — an embedder settings change was inert
         // until the editor was rebuilt. Plain assignment: a tiny value struct,
         // and no rebuild is needed for it to take effect.
+        let spacingChanged = context.coordinator.configuration.lists.itemSpacing != configuration.lists.itemSpacing
+            || context.coordinator.configuration.lists.adjacentParagraphSpacing != configuration.lists.adjacentParagraphSpacing
         textView.configuration.lists = configuration.lists
         context.coordinator.configuration.lists = configuration.lists
         // Sync registered extensions (inline spans + fenced blocks). A change alters the GRAMMAR
@@ -444,10 +446,13 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         // cache must drop before the restyle — the parse-layer memos invalidate
         // themselves via the registry fingerprint.
         let newExtensionFingerprint = configuration.extensionRegistry.fingerprint
-        if newExtensionFingerprint != context.coordinator.configuration.extensionRegistry.fingerprint {
+        let extensionsChanged = newExtensionFingerprint != context.coordinator.configuration.extensionRegistry.fingerprint
+        if extensionsChanged {
             context.coordinator.configuration.extensions = configuration.extensions
             textView.configuration.extensions = configuration.extensions
             context.coordinator.cachedParsedDocument = nil
+        }
+        if extensionsChanged || spacingChanged {
             let fullRange = NSRange(location: 0, length: (textView.string as NSString).length)
             if fullRange.length > 0 {
                 context.coordinator.restyleParagraphs([fullRange], in: textView)

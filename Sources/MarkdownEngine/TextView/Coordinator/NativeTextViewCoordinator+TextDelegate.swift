@@ -200,11 +200,21 @@ extension NativeTextViewCoordinator {
             return editedRange.location == NSNotFound ? safeSelRange : editedRange
         }()
         let editedParagraphs = paragraphRanges(in: fullText, intersecting: safeEditedRange)
-        let paragraphCandidates: [NSRange] = [
+        var paragraphCandidates: [NSRange] = [
             previousParagraph,
             paragraphRange,
             nextParagraph
         ] + editedParagraphs
+        // A multiline paste can place the caret far from the start of its edit.
+        // The adjacent list item may now have gained or lost a neighboring item or prose block.
+        if configuration.lists.itemSpacing != nil || configuration.lists.adjacentParagraphSpacing != nil {
+            if let start = editedParagraphs.first?.location, start > 0 {
+                paragraphCandidates.append(fullText.paragraphRange(for: NSRange(location: start - 1, length: 0)))
+            }
+            if let last = editedParagraphs.last, NSMaxRange(last) < documentLength {
+                paragraphCandidates.append(fullText.paragraphRange(for: NSRange(location: NSMaxRange(last), length: 0)))
+            }
+        }
 
         let backtickCount = PerfTrace.measure("backtick") {
             incrementalBacktickCensus(fullText: fullText, editedRange: editedRange,

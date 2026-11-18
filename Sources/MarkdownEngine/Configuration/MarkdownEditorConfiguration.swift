@@ -440,6 +440,14 @@ public struct ListStyle: Sendable {
     public var maximumNestingLevel: Int
     /// Extra line height added on top of the default to give list items room.
     public var extraLineHeight: CGFloat
+    /// Paragraph spacing after an item followed by another item in the same list.
+    /// Wrapped lines keep their line height, and the last item uses the body
+    /// paragraph spacing. With `nil`, all items inherit body paragraph spacing.
+    public var itemSpacing: CGFloat?
+    /// Space before or after a list directly adjoining a prose paragraph.
+    /// An intervening blank line keeps its own height. With `nil`, the list
+    /// and its neighboring paragraphs use their usual paragraph metrics.
+    public var adjacentParagraphSpacing: CGFloat?
     /// Width (in points) of the marker slot — from the marker glyph's left
     /// edge to the item content's left edge. Setting it opts the list layout
     /// into a fixed indent GRID; `nil` (the default) keeps the historical
@@ -504,7 +512,9 @@ public struct ListStyle: Sendable {
         markerTextGap: CGFloat? = nil,
         markerSlotWidth: CGFloat? = nil,
         orderedMarkerStyles: [OrderedMarkerStyle] = [.numeric],
-        bulletDiameter: CGFloat? = nil
+        bulletDiameter: CGFloat? = nil,
+        itemSpacing: CGFloat? = nil,
+        adjacentParagraphSpacing: CGFloat? = nil
     ) {
         self.helpersEnabled = helpersEnabled
         self.autoClosePairsEnabled = autoClosePairsEnabled
@@ -516,6 +526,8 @@ public struct ListStyle: Sendable {
         self.markerSlotWidth = markerSlotWidth
         self.orderedMarkerStyles = orderedMarkerStyles
         self.bulletDiameter = bulletDiameter
+        self.itemSpacing = itemSpacing
+        self.adjacentParagraphSpacing = adjacentParagraphSpacing
     }
 
     /// The marker-column width actually in effect: ``markerSlotWidth`` gated
