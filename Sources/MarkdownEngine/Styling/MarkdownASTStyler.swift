@@ -62,7 +62,8 @@ enum MarkdownASTStyler {
         codePara.maximumLineHeight = codeLineHeight
         // precomputed=0 ⇒ the document is parsed a SECOND time here (the rebuild already parsed it).
         // Ahead of `ctx` because the ordered-list display numbers are derived from these blocks.
-        let blocks = DocumentAST.parse(text, scopedRanges: scopedRanges, precomputedBlocks: precomputedBlocks,
+        let sourceBlocks = precomputedBlocks ?? BlockParser.parse(text, registry: configuration.extensionRegistry)
+        let blocks = DocumentAST.parse(text, scopedRanges: scopedRanges, precomputedBlocks: sourceBlocks,
                                        registry: configuration.extensionRegistry)
         let ctx = Ctx(
             ns: ns,
@@ -83,6 +84,7 @@ enum MarkdownASTStyler {
             extensionsByID: configuration.extensionsByID,
             wikiLinkID: wikiLinkIDProvider,
             scopedRanges: scopedRanges,
+            paragraphListBoundaries: configuration.lists.adjacentParagraphSpacing == nil ? [] : paragraphListBoundaries(sourceBlocks),
             orderedDisplayNumbers: computeOrderedDisplayNumbers(blocks: blocks, ns: ns),
             listDepths: computeListDepths(blocks: blocks, ns: ns)
         )
@@ -429,8 +431,20 @@ enum MarkdownASTStyler {
         return result
     }
 
+    /// Scoped ASTs omit distant blocks. Use the same full block classification
+    /// that supplied the AST to recognize both sides of a list/prose boundary.
+    private static func paragraphListBoundaries(_ blocks: [Block]) -> Set<Int> {
+        Set(zip(blocks, blocks.dropFirst()).compactMap { previous, next in
+            switch (previous.kind, next.kind) {
+            case (.paragraph, .list), (.list, .paragraph): next.range.location
+            default: nil
+            }
+        })
+    }
+
     /// AST list-item decoration: indent paragraph, `•` bullet, checkbox + strikethrough, all caret-aware.
-    private static func styleListItem(_ item: ListItem, displayNumber: Int?, ctx: Ctx, into attrs: inout [StyledRange]) {
+    private static func styleListItem(_ item: ListItem, displayNumber: Int?, spacingBefore: CGFloat, spacingAfter: CGFloat,
+                                      ctx: Ctx, into attrs: inout [StyledRange]) {
         guard ctx.config.lists.helpersEnabled else { return }
 
         // Line content (item line minus its trailing newline).
@@ -522,8 +536,8 @@ enum MarkdownASTStyler {
         ps.minimumLineHeight = lineHeight - trailing
         ps.maximumLineHeight = lineHeight - trailing
         ps.lineSpacing = trailing
-        ps.paragraphSpacing = ctx.baseParagraphSpacing
-        ps.paragraphSpacingBefore = 0
+        ps.paragraphSpacing = spacingAfter
+        ps.paragraphSpacingBefore = spacingBefore
         ps.tabStops = []
         if let gap = ctx.config.lists.markerTextGap,
            item.contentRange.location - 1 >= NSMaxRange(item.marker) {
@@ -742,6 +756,7 @@ enum MarkdownASTStyler {
         let extensionsByID: [String: any MarkdownExtension]
         let wikiLinkID: (NSRange) -> String?
         let scopedRanges: [NSRange]?
+        let paragraphListBoundaries: Set<Int>
         let orderedDisplayNumbers: [Int: Int]
         /// Structural nesting depth (0-based) per list item, keyed by marker
         /// location — see `computeListDepths`.
@@ -820,9 +835,14 @@ enum MarkdownASTStyler {
             styleBlockquote(range: range, ctx: ctx, into: &attrs)
             styleInlines(inlines, font: font, ctx: ctx, into: &attrs)
 
-        case .list(_, let items):
-            for item in items {
+        case .list(let range, let items):
+            let lists = ctx.config.lists
+            let before = ctx.paragraphListBoundaries.contains(range.location) ? lists.adjacentParagraphSpacing : nil
+            let after = ctx.paragraphListBoundaries.contains(NSMaxRange(range)) ? lists.adjacentParagraphSpacing : nil
+            for (index, item) in items.enumerated() {
+                let spacing = index + 1 < items.count ? lists.itemSpacing : after
                 styleListItem(item, displayNumber: ctx.orderedDisplayNumbers[item.marker.location],
+                              spacingBefore: index == 0 ? (before ?? 0) : 0, spacingAfter: spacing ?? ctx.baseParagraphSpacing,
                               ctx: ctx, into: &attrs)
                 styleInlines(item.inlines, font: font, ctx: ctx, into: &attrs)
             }

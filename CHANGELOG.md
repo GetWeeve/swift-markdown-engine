@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `ListStyle.itemSpacing` and `adjacentParagraphSpacing` independently control space between list items and at list/prose boundaries.
 - `MarkdownExtension.plainText(source:childrenText:)`: the plain-text
   counterpart of `html(childrenHTML:)`, applied to the `.string` and
   `dev.markdownengine.raw-markdown` flavors by the new
