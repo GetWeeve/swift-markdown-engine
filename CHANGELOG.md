@@ -89,6 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   continues, instead of being claimed and (for a boxed span) laid out as blank
   line space over characters that stay invisible. Default nil, so every
   existing extension parses exactly as before.
+- Editors can opt into a distinct ink for the focused prose paragraph, centered leading for prose and list items, and a circular bullet in a fixed marker column.
 - Heading styles accept per-level named or system font faces. Editor themes can set the plain insertion-point color while retaining contrasting caret ink inside styled spans.
 - `ListStyle.taskShorthandEnabled` (default `false`): typing a space when the
   line so far reads `[]`, `[ ]`, or `- []` (after optional leading indent)

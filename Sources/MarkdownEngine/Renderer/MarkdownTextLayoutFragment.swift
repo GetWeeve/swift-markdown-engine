@@ -88,8 +88,15 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
         // 2. LaTeX images (behind text — hidden markers are invisible anyway)
         drawLatexImages(at: point, in: context)
 
-        // 3. Normal text
-        super.draw(at: point, in: context)
+        // 3. Normal text. Only the glyph pass uses the embedder's smoothing preference.
+        if (textLayoutManager?.textContainer?.textView as? NativeTextView)?.configuration.paragraph.usesFontSmoothing == false {
+            context.saveGState()
+            context.setShouldSmoothFonts(false)
+            super.draw(at: point, in: context)
+            context.restoreGState()
+        } else {
+            super.draw(at: point, in: context)
+        }
 
         // 4. Task checkboxes (on top of hidden [ ]/[x] markers)
         drawTaskCheckboxes(at: point, in: context)
@@ -744,6 +751,18 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
             // position. Otherwise center on the source char's own advance.
             let slotWidth = (self.textLayoutManager?.textContainer?.textView as? NativeTextView)?
                 .configuration.lists.effectiveMarkerSlotWidth
+            if let slotWidth, !isSelected,
+               let configuration = (self.textLayoutManager?.textContainer?.textView as? NativeTextView)?.configuration,
+               let diameter = configuration.lists.bulletDiameter,
+               diameter > 0, let line = self.lineBounds(forLocalIndex: attrRange.location - range.location, point: point) {
+                let side = min(diameter, slotWidth, line.height)
+                let trailing = configuration.paragraph.trailingLineSpacing(for: configuration.lists.extraLineHeight)
+                let circle = CGRect(x: pos.x + (slotWidth - side) / 2, y: line.midY + (trailing - side) / 2,
+                                    width: side, height: side)
+                (theme.listMarker ?? theme.bodyText).setFill()
+                NSBezierPath(ovalIn: circle).fill()
+                return
+            }
             let xOffset: CGFloat
             if let slotWidth, !isSelected {
                 xOffset = (slotWidth - glyphWidth) / 2
@@ -844,7 +863,10 @@ final class MarkdownTextLayoutFragment: NSTextLayoutFragment {
             let boxX = TaskCheckboxGeometry.boxX(
                 contentX: pos.x, size: size, markerTextGap: configuration.lists.markerTextGap
             )
-            let centerY = pos.baselineY + (descent - ascent) / 2
+            let line = configuration.paragraph.centersExtraLineHeight
+                ? lineBounds(forLocalIndex: attrRange.location - range.location, point: point) : nil
+            let trailing = configuration.paragraph.trailingLineSpacing(for: configuration.lists.extraLineHeight)
+            let centerY = line.map { $0.midY + trailing / 2 } ?? (pos.baselineY + (descent - ascent) / 2)
             let boxY = centerY - size / 2
 
             let scale = textLayoutManager?.textContainer?.textView?.window?.backingScaleFactor

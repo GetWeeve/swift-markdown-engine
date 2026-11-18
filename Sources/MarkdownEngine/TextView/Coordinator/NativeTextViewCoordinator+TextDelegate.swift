@@ -473,6 +473,11 @@ extension NativeTextViewCoordinator {
         let paragraphRange = nsText.paragraphRange(for: NSRange(location: caretLoc, length: 0))
 
         let shouldSkipSelectionRestyle = pendingEditedRange != nil
+        let editingParagraphChanged = configuration.theme.editingParagraphText != nil
+            && ((previousSelectedRange?.length == 0) != (selRange.length == 0)
+                || (selRange.length == 0 && previousCaretLocation.map {
+                    nsText.paragraphRange(for: NSRange(location: min($0, nsText.length), length: 0)) != paragraphRange
+                } == true))
         let tokensChanged = activeTokenIndices != prevActive
         // Caret crossings in/out of `- [ ]` syntax need a restyle too: task
         // checkboxes aren't tracked as tokens, so `tokensChanged` won't
@@ -543,7 +548,7 @@ extension NativeTextViewCoordinator {
         } else if isDragSelecting {
             needsRestyleAfterDrag = true
         } else if tokensChanged || taskSyntaxChanged || hrLineChanged || bulletSyntaxChanged
-                    || orderedSyntaxChanged || selectionSpanChanged || needsRestyleAfterDrag {
+                    || orderedSyntaxChanged || selectionSpanChanged || editingParagraphChanged || needsRestyleAfterDrag {
             needsRestyleAfterDrag = false
             // Candidates are built ONLY when a restyle actually runs — this
             // used to happen unconditionally on every selection change,

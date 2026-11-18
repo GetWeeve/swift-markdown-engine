@@ -17,7 +17,8 @@ extension NativeTextViewCoordinator {
     func rebuildTextStorageAndStyle(
         _ textView: NSTextView,
         from text: String,
-        invalidateLayout: Bool = false
+        invalidateLayout: Bool = false,
+        preservingSelection: Bool = false
     ) {
         // Suppress the re-entrant textViewDidChangeSelection that `textView.string =`
         // and the setAttributedString transfer below fire synchronously (71ms of
@@ -34,6 +35,7 @@ extension NativeTextViewCoordinator {
         let rawMode = configuration.rawSourceMode
         let displayText: String
         if rawMode {
+            textView.insertionPointColor = textView.isEditable ? configuration.theme.resolvedInsertionPointColor : .clear
             displayText = text
             wikiLinkMetadata = [:]
         } else {
@@ -48,7 +50,9 @@ extension NativeTextViewCoordinator {
         // the ensureLayout below rebuilds from scratch anyway. This rebuild's own
         // ensureLayout IS that one-shot per-document layout.
         didEnsureLayoutForCurrentDocument = true
-        if textView.string != displayText {
+        let sameContent = textView.string == displayText
+        let retainedSelections = preservingSelection && sameContent ? textView.selectedRanges : nil
+        if !sameContent {
             textView.string = displayText
             parseGeneration &+= 1
         }
@@ -88,6 +92,7 @@ extension NativeTextViewCoordinator {
 
         // Kept for the end-of-rebuild selection replay (see below); raw mode leaves it nil.
         var parsedForReplay: ParsedDocument?
+        let styledParagraph = (textView as? NativeTextView)?.editingParagraph
         if rawMode {
             // Base attributes only — the source stays verbatim and unstyled.
             activeTokenIndices = []
@@ -113,6 +118,7 @@ extension NativeTextViewCoordinator {
                 // Selection-revealed syntax (task checkboxes) needs the full
                 // range, not just the caret; read-only suppresses it like the caret.
                 selection: textView.isEditable ? textView.selectedRange() : nil,
+                editingParagraph: styledParagraph,
                 activeTokenIndices: activeTokenIndices,
                 // FIX: apply .wikiLinkID attributes on load/node-switch too. Without this the uuid
                 // survived only in the range-keyed wikiLinkMetadata; once a later writeback shifted a
@@ -151,6 +157,7 @@ extension NativeTextViewCoordinator {
         textView.textStorage?.beginEditing()
         textView.textStorage?.setAttributedString(built)
         textView.textStorage?.endEditing()
+        if let retainedSelections { textView.selectedRanges = retainedSelections }
 
 
         textView.typingAttributes = TextStylingService.makeBaseTypingAttributes(
@@ -175,6 +182,16 @@ extension NativeTextViewCoordinator {
         // rawSourceMode / isWritingToolsActive early-returns would have.
         if let parsed = parsedForReplay, !isWritingToolsActive {
             let finalSelection = textView.selectedRange()
+            activeTokenIndices = self.activeTokenIndices(parsed: parsed, selection: finalSelection, in: nsDisplay, suppressed: !textView.isEditable)
+            let currentParagraph = (textView as? NativeTextView)?.editingParagraph
+            if styledParagraph != currentParagraph {
+                let affected = [styledParagraph, currentParagraph].compactMap { $0 }
+                restyleTextView(textView, paragraphCandidates: affected, tokens: parsed.tokens,
+                                classified: parsed.classified, blocks: parsed.blocks)
+            }
+            let ink = textView.isEditable ? caretColor(at: finalSelection.location, tokens: parsed.tokens, active: activeTokenIndices) : .clear
+            resolvedCaretColor = ink
+            textView.insertionPointColor = ink
             updateAutocorrectSettings(
                 textView,
                 caretLocation: finalSelection.location,

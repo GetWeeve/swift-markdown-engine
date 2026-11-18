@@ -32,8 +32,10 @@ struct TextStylingService {
         let baseFont = NSFont(name: fontName, size: fontSize) ?? NSFont.systemFont(ofSize: fontSize)
         let defaultLineHeight = layoutBridgeDefaultLineHeight(for: baseFont, using: layoutBridge)
         let paragraph = NSMutableParagraphStyle()
-        paragraph.minimumLineHeight = ceil(defaultLineHeight) + configuration.paragraph.lineHeightExtraSpacing
-        paragraph.lineSpacing = 0
+        let extra = configuration.paragraph.lineHeightExtraSpacing
+        let trailing = configuration.paragraph.trailingLineSpacing(for: extra)
+        paragraph.minimumLineHeight = ceil(defaultLineHeight) + extra - trailing
+        paragraph.lineSpacing = trailing
         let baseParagraphSpacing = ceil(defaultLineHeight * configuration.paragraph.spacingFactor)
         paragraph.paragraphSpacing = baseParagraphSpacing
         paragraph.paragraphSpacingBefore = 0
@@ -81,6 +83,7 @@ struct TextStylingService {
             layoutBridge: layoutBridge,
             caretLocation: caretLocation,
             selection: selection,
+            editingParagraph: (textView as? NativeTextView)?.editingParagraph,
             activeTokenIndices: activeTokenIndices,
             wikiLinkIDProvider: wikiLinkIDProvider,
             precomputedTokens: precomputedTokens,

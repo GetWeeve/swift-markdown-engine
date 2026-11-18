@@ -158,6 +158,15 @@ public struct MarkdownEditorConfiguration: Sendable {
         self.caretFollowAnimationDuration = max(0, caretFollowAnimationDuration)
     }
 
+    /// Keep font-dependent presentation in sync without resetting a user's in-session editing policies.
+    mutating func adoptTypography(from configuration: Self) {
+        headings = configuration.headings
+        paragraph = configuration.paragraph
+        blockquote = configuration.blockquote
+        codeBlock = configuration.codeBlock
+        inlineCode = configuration.inlineCode
+    }
+
     public static let `default` = MarkdownEditorConfiguration()
 }
 
@@ -481,6 +490,10 @@ public struct ListStyle: Sendable {
     /// `.numeric` — keeps every level numeric, the historical rendering.
     public var orderedMarkerStyles: [OrderedMarkerStyle]
 
+    /// Diameter of a circular bullet centered in the fixed marker column.
+    /// With no diameter or column, bullets use the body font’s glyph.
+    public var bulletDiameter: CGFloat?
+
     public init(
         helpersEnabled: Bool = true,
         autoClosePairsEnabled: Bool = true,
@@ -490,7 +503,8 @@ public struct ListStyle: Sendable {
         extraLineHeight: CGFloat = 2,
         markerTextGap: CGFloat? = nil,
         markerSlotWidth: CGFloat? = nil,
-        orderedMarkerStyles: [OrderedMarkerStyle] = [.numeric]
+        orderedMarkerStyles: [OrderedMarkerStyle] = [.numeric],
+        bulletDiameter: CGFloat? = nil
     ) {
         self.helpersEnabled = helpersEnabled
         self.autoClosePairsEnabled = autoClosePairsEnabled
@@ -501,6 +515,7 @@ public struct ListStyle: Sendable {
         self.markerTextGap = markerTextGap
         self.markerSlotWidth = markerSlotWidth
         self.orderedMarkerStyles = orderedMarkerStyles
+        self.bulletDiameter = bulletDiameter
     }
 
     /// The marker-column width actually in effect: ``markerSlotWidth`` gated
@@ -801,9 +816,22 @@ public struct ParagraphStyle: Sendable {
     /// Extra height (points) added to the default paragraph line height.
     public var lineHeightExtraSpacing: CGFloat
 
-    public init(spacingFactor: CGFloat = 0.3, lineHeightExtraSpacing: CGFloat = 2) {
+    /// Split additional line height evenly above and below ordinary text and list items.
+    /// When disabled, TextKit retains its default baseline.
+    public var centersExtraLineHeight: Bool
+    /// Keep native glyph antialiasing while opting out of additional smoothing on composited surfaces.
+    public var usesFontSmoothing: Bool
+
+    public init(spacingFactor: CGFloat = 0.3, lineHeightExtraSpacing: CGFloat = 2,
+                centersExtraLineHeight: Bool = false, usesFontSmoothing: Bool = true) {
+        self.usesFontSmoothing = usesFontSmoothing
+        self.centersExtraLineHeight = centersExtraLineHeight
         self.spacingFactor = spacingFactor
         self.lineHeightExtraSpacing = lineHeightExtraSpacing
+    }
+
+    func trailingLineSpacing(for extraHeight: CGFloat) -> CGFloat {
+        centersExtraLineHeight ? max(0, floor(extraHeight / 2)) : 0
     }
 
     public static let `default` = ParagraphStyle()

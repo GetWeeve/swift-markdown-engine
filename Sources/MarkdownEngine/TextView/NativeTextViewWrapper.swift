@@ -485,7 +485,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
                 context.coordinator.restyleParagraphs([fullRange], in: textView)
             }
         }
-        textView.isEditable = isEditable
+        textView.updateEditability(isEditable)
         textView.isSelectable = true
         // Keep the caret ink the selection handler resolved (an extension span
         // can invert it); a plain bodyText reset here stomps it on every pass.
@@ -514,6 +514,10 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
             return
         }
         if fontChanged {
+            // Embedders can choose heading faces, code faces and paragraph metrics
+            // alongside a body-font preference. Rebuild with the same configuration.
+            context.coordinator.configuration.adoptTypography(from: configuration)
+            textView.configuration.adoptTypography(from: configuration)
             context.coordinator.didInitialFormatting = false
         }
         if isNodeSwitch {
@@ -571,7 +575,8 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         context.coordinator.rebuildTextStorageAndStyle(
             textView,
             from: text,
-            invalidateLayout: isNodeSwitch || rawSourceModeChanged
+            invalidateLayout: isNodeSwitch || rawSourceModeChanged,
+            preservingSelection: fontChanged && !isNodeSwitch && !rawSourceModeChanged
         )
         textView.recalcOverscroll(for: nsView)
         (nsView as? ClampedScrollView)?.clampToInsets()
