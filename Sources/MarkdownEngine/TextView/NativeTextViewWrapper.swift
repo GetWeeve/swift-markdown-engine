@@ -243,7 +243,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         textView.maxOverscrollPoints = configuration.overscroll.maxPoints
         textView.minOverscrollPoints = configuration.overscroll.minPoints
         context.coordinator.configuration = configuration
-        textView.insertionPointColor = configuration.theme.bodyText
+        textView.insertionPointColor = isEditable ? configuration.theme.resolvedInsertionPointColor : .clear
         textView.linkTextAttributes = configuration.theme.linkTextAttributes
         textView.isEditable = isEditable
         textView.isSelectable = true
@@ -490,7 +490,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         // Keep the caret ink the selection handler resolved (an extension span
         // can invert it); a plain bodyText reset here stomps it on every pass.
         textView.insertionPointColor = isEditable
-            ? (context.coordinator.resolvedCaretColor ?? context.coordinator.configuration.theme.bodyText)
+            ? (context.coordinator.resolvedCaretColor ?? context.coordinator.configuration.theme.resolvedInsertionPointColor)
             : .clear
         // Keep the display-time link ink in sync with the theme handed in on
         // this pass (mirrors the insertionPointColor refresh above).

@@ -573,6 +573,23 @@ public struct HeadingStyle: Sendable {
     /// heading font at draw time, so a typo degrades to the stock look
     /// instead of changing metrics.
     public var fontName: String?
+    /// Typeface for one heading level, resolved at the level's configured size.
+    public enum Face: Sendable {
+        /// A named PostScript face, including a registered variable font instance.
+        case named(String)
+        /// The native system font at the requested weight and optical size.
+        case system(weight: NSFont.Weight)
+
+        func font(at size: CGFloat) -> NSFont? {
+            switch self {
+            case .named(let name): NSFont(name: name, size: size)
+            case .system(let weight): NSFont.systemFont(ofSize: size, weight: weight)
+            }
+        }
+    }
+    /// Optional H1 through H6 faces. An omitted or unresolvable face uses
+    /// ``fontName``, followed by the base bold face.
+    public var faces: [Face]
     /// Font-size multiplier per heading level (1...6).
     public var fontMultipliers: [CGFloat]
     /// Top spacing in `em` units per heading level (1...6).
@@ -588,16 +605,25 @@ public struct HeadingStyle: Sendable {
 
     public init(
         fontName: String? = nil,
+        faces: [Face] = [],
         fontMultipliers: [CGFloat] = [2.0, 1.5, 1.17, 1.0, 0.83, 0.67],
         topSpacingEm: [CGFloat] = [0.35, 0.30, 0.25, 0.20, 0.15, 0.10],
         lineHeights: [CGFloat] = [],
         paragraphSpacing: CGFloat? = nil
     ) {
         self.fontName = fontName
+        self.faces = faces
         self.fontMultipliers = fontMultipliers
         self.topSpacingEm = topSpacingEm
         self.lineHeights = lineHeights
         self.paragraphSpacing = paragraphSpacing
+    }
+
+    func font(for level: Int, size: CGFloat) -> NSFont? {
+        if faces.indices.contains(level - 1), let font = faces[level - 1].font(at: size) {
+            return font
+        }
+        return fontName.flatMap { NSFont(name: $0, size: size) }
     }
 
     public func fontMultiplier(for level: Int) -> CGFloat {

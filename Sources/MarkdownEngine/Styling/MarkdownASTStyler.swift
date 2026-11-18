@@ -783,8 +783,7 @@ enum MarkdownASTStyler {
             // embedder's choice, so no synthetic bold on top. A name that
             // doesn't resolve degrades to the stock heading font (base family,
             // bold trait), mirroring TaskCheckboxStyle's symbol fallback.
-            let headingFont = ctx.config.headings.fontName
-                .flatMap { NSFont(name: $0, size: headingSize) }
+            let headingFont = ctx.config.headings.font(for: level, size: headingSize)
                 ?? adding(.bold, to: NSFont(name: ctx.fontName, size: headingSize)
                     ?? .systemFont(ofSize: headingSize))
             let lineHeight = ctx.config.headings.lineHeight(for: level)

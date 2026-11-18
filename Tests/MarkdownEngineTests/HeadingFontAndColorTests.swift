@@ -74,6 +74,22 @@ struct HeadingFontAndColorTests {
         #expect(font(in: attrs, at: 7) == nil)
     }
 
+    @Test("per-level faces honor native weights and fall back to the shared heading face")
+    func levelsUseTheirFaceAtTheConfiguredSize() throws {
+        let first = NSFont.systemFont(ofSize: base * 2, weight: .medium)
+        let second = try #require(NSFont(name: "Georgia", size: 20))
+        let config = MarkdownEditorConfiguration(headings: HeadingStyle(
+            fontName: headingFace, faces: [.system(weight: .medium), .named(second.fontName), .named("Missing-Test-Font")]
+        ))
+        let text = "# One\n\n## Two\n\n### Three"
+        let attrs = style(text, configuration: config)
+        for (level, word, face) in [(1, "One", first.fontName), (2, "Two", second.fontName), (3, "Three", headingFace)] {
+            let actual = try #require(font(in: attrs, at: (text as NSString).range(of: word).location))
+            #expect(actual.fontName == face)
+            #expect(actual.pointSize == base * config.headings.fontMultiplier(for: level))
+        }
+    }
+
     @Test("emphasis inside a custom-face heading keeps family and size, adds traits")
     func emphasisComposesOnTheCustomHeadingFace() {
         let config = MarkdownEditorConfiguration(headings: HeadingStyle(fontName: headingFace))

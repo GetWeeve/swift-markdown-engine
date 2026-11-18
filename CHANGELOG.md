@@ -89,6 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   continues, instead of being claimed and (for a boxed span) laid out as blank
   line space over characters that stay invisible. Default nil, so every
   existing extension parses exactly as before.
+- Heading styles accept per-level named or system font faces. Editor themes can set the plain insertion-point color while retaining contrasting caret ink inside styled spans.
 - `ListStyle.taskShorthandEnabled` (default `false`): typing a space when the
   line so far reads `[]`, `[ ]`, or `- []` (after optional leading indent)
   rewrites that prefix into an unchecked `- [ ] ` task item, keeping the
