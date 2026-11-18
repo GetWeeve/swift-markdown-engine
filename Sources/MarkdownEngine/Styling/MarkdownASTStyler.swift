@@ -28,6 +28,7 @@ enum MarkdownASTStyler {
         fontSize: CGFloat,
         caretLocation: Int = -1,
         selection: NSRange? = nil,
+        editingParagraph: NSRange? = nil,
         wikiLinkIDProvider: @escaping (NSRange) -> String? = { _ in nil },
         scopedRanges: [NSRange]? = nil,
         precomputedBlocks: [Block]? = nil,
@@ -76,6 +77,7 @@ enum MarkdownASTStyler {
             codeParagraphStyle: codePara,
             inlineMarkerFont: NSFont(name: fontName, size: hiddenSize) ?? .systemFont(ofSize: hiddenSize),
             caret: caretLocation,
+            editingParagraph: editingParagraph,
             selection: selection,
             config: configuration,
             extensionsByID: configuration.extensionsByID,
@@ -516,9 +518,10 @@ enum MarkdownASTStyler {
         let gridDepthIndent = CGFloat(structuralDepth) * ctx.config.lists.indentPerLevel
         let ps = NSMutableParagraphStyle()
         let lineHeight = ctx.baseLineHeight + ctx.config.lists.extraLineHeight
-        ps.minimumLineHeight = lineHeight
-        ps.maximumLineHeight = lineHeight
-        ps.lineSpacing = 0
+        let trailing = ctx.config.paragraph.trailingLineSpacing(for: ctx.config.lists.extraLineHeight)
+        ps.minimumLineHeight = lineHeight - trailing
+        ps.maximumLineHeight = lineHeight - trailing
+        ps.lineSpacing = trailing
         ps.paragraphSpacing = ctx.baseParagraphSpacing
         ps.paragraphSpacingBefore = 0
         ps.tabStops = []
@@ -727,6 +730,7 @@ enum MarkdownASTStyler {
         let codeParagraphStyle: NSParagraphStyle
         let inlineMarkerFont: NSFont
         let caret: Int
+        let editingParagraph: NSRange?
         /// The full selected range (nil/empty when the selection is a bare
         /// caret). Token-based elements already reveal on selection via
         /// `activeTokenIndices(selection:)`; this brings the same signal to
@@ -773,7 +777,11 @@ enum MarkdownASTStyler {
 
     private static func styleBlock(_ block: BlockNode, font: NSFont, ctx: Ctx, into attrs: inout [StyledRange]) {
         switch block {
-        case .paragraph(_, let inlines):
+        case .paragraph(let range, let inlines):
+            if let editing = ctx.editingParagraph, let ink = ctx.theme.editingParagraphText {
+                let overlap = NSIntersectionRange(editing, range)
+                if overlap.length > 0 { attrs.append((overlap, [.foregroundColor: ink])) }
+            }
             styleInlines(inlines, font: font, ctx: ctx, into: &attrs)
 
         case .heading(let level, let range, let markers, let inlines):
@@ -783,8 +791,7 @@ enum MarkdownASTStyler {
             // embedder's choice, so no synthetic bold on top. A name that
             // doesn't resolve degrades to the stock heading font (base family,
             // bold trait), mirroring TaskCheckboxStyle's symbol fallback.
-            let headingFont = ctx.config.headings.fontName
-                .flatMap { NSFont(name: $0, size: headingSize) }
+            let headingFont = ctx.config.headings.font(for: level, size: headingSize)
                 ?? adding(.bold, to: NSFont(name: ctx.fontName, size: headingSize)
                     ?? .systemFont(ofSize: headingSize))
             let lineHeight = ctx.config.headings.lineHeight(for: level)

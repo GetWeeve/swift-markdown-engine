@@ -16,7 +16,7 @@ import Foundation
 
 extension NativeTextViewCoordinator {
 
-    /// Foreground an extension paints at `location`, or `theme.bodyText`.
+    /// Foreground an extension paints at `location`, or the configured plain insertion-point color.
     /// Only the CONTENT counts — on the `==` markers the background is the page
     /// again, so the caret belongs back at the body color.
     ///
@@ -28,7 +28,7 @@ extension NativeTextViewCoordinator {
     /// look at the two or three under the caret.
     func caretColor(at location: Int, tokens: [MarkdownToken], active: Set<Int>) -> NSColor {
         let theme = configuration.theme
-        guard configuration.cursorFollowsSpanInk else { return theme.bodyText }
+        guard configuration.cursorFollowsSpanInk else { return theme.resolvedInsertionPointColor }
         // Which extensions repaint their ink at all — for a registry where none
         // does (the engine's own highlight/strikethrough paint background and
         // decoration only) this is where the work stops, before the token scan.
@@ -38,7 +38,7 @@ extension NativeTextViewCoordinator {
                 inkByID[ext.id] = color
             }
         }
-        guard !inkByID.isEmpty else { return theme.bodyText }
+        guard !inkByID.isEmpty else { return theme.resolvedInsertionPointColor }
         var innermost: (length: Int, color: NSColor)?
         for index in active {
             guard index >= 0, index < tokens.count else { continue }
@@ -51,6 +51,6 @@ extension NativeTextViewCoordinator {
                 innermost = (token.contentRange.length, color)   // nested spans: the tightest one wins
             }
         }
-        return innermost?.color ?? theme.bodyText
+        return innermost?.color ?? theme.resolvedInsertionPointColor
     }
 }

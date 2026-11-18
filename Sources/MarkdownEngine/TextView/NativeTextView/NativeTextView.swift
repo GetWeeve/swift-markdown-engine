@@ -17,6 +17,50 @@ import AppKit
 import UniformTypeIdentifiers
 
 final class NativeTextView: NSTextView {
+    private var hasInsertionFocus = false
+
+    var editingParagraph: NSRange? {
+        guard hasInsertionFocus, isEditable, configuration.theme.editingParagraphText != nil else { return nil }
+        let selection = selectedRange()
+        let source = string as NSString
+        guard selection.length == 0, selection.location <= source.length else { return nil }
+        return source.paragraphRange(for: selection)
+    }
+
+    func updateEditability(_ editable: Bool) {
+        guard isEditable != editable else { return }
+        let oldParagraph = editingParagraph
+        isEditable = editable
+        guard let coordinator = delegate as? NativeTextViewCoordinator else { return }
+        refreshEditingParagraph(oldParagraph ?? editingParagraph)
+        if editable {
+            let parsed = coordinator.parsedDocument(for: string)
+            let selection = selectedRange()
+            let active = coordinator.activeTokenIndices(parsed: parsed, selection: selection, in: string as NSString, suppressed: false)
+            coordinator.resolvedCaretColor = coordinator.caretColor(at: selection.location, tokens: parsed.tokens, active: active)
+        }
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        guard super.becomeFirstResponder() else { return false }
+        hasInsertionFocus = true
+        refreshEditingParagraph(editingParagraph)
+        return true
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let previous = editingParagraph
+        guard super.resignFirstResponder() else { return false }
+        hasInsertionFocus = false
+        refreshEditingParagraph(previous)
+        return true
+    }
+
+    private func refreshEditingParagraph(_ range: NSRange?) {
+        guard let range, range.length > 0, let coordinator = delegate as? NativeTextViewCoordinator else { return }
+        coordinator.restyleParagraphs([range], in: self)
+    }
+
     // MARK: Frame & overscroll state
     var baseContentHeight: CGFloat = 0
     var activeBottomOverscroll: CGFloat = 0

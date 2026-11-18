@@ -54,6 +54,19 @@ struct CaretColorTests {
     // "plain ==marked== tail": content `marked` is {8, 6}, markers {6,2} and {14,2}.
     private static let text = "plain ==marked== tail"
 
+    @Test("ordinary text can have its own caret ink without changing extension contrast")
+    func explicitCaretColorIsRestoredAfterLeavingSpan() {
+        let (coordinator, tv) = makeEditor(Self.text, extensions: [InvertingHighlight()])
+        coordinator.configuration.theme.insertionPointColor = .systemRed
+        tv.setSelectedRange(NSRange(location: 11, length: 0))
+        #expect(tv.insertionPointColor == .black)
+        tv.setSelectedRange(NSRange(location: 1, length: 0))
+        #expect(tv.insertionPointColor == .systemRed)
+        coordinator.configuration.cursorFollowsSpanInk = false
+        tv.setSelectedRange(NSRange(location: 11, length: 0))
+        #expect(tv.insertionPointColor == .systemRed)
+    }
+
     @Test("caret inside the span takes the span's ink, and gives it back on the way out")
     func caretInsideSpanInvertsAndRestores() {
         let (coordinator, tv) = makeEditor(Self.text, extensions: [InvertingHighlight()])

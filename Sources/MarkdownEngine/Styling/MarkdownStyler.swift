@@ -201,6 +201,7 @@ enum MarkdownStyler {
         layoutBridge: LayoutBridge? = nil,
         caretLocation: Int,
         selection: NSRange? = nil,
+        editingParagraph: NSRange? = nil,
         activeTokenIndices: Set<Int>,
         wikiLinkIDProvider: @escaping (NSRange) -> String? = { _ in nil },
         precomputedTokens: [MarkdownToken]? = nil,
@@ -247,7 +248,7 @@ enum MarkdownStyler {
         let astT0 = DispatchTime.now().uptimeNanoseconds
         result += MarkdownASTStyler.styleAttributes(
             text: text, fontName: fontName, fontSize: fontSize,
-            caretLocation: caretLocation, selection: selection, wikiLinkIDProvider: wikiLinkIDProvider,
+            caretLocation: caretLocation, selection: selection, editingParagraph: editingParagraph, wikiLinkIDProvider: wikiLinkIDProvider,
             scopedRanges: scopedRanges, precomputedBlocks: precomputedBlocks,
             configuration: configuration
         )

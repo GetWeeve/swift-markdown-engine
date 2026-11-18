@@ -28,8 +28,18 @@ public struct MarkdownEditorTheme: Sendable {
 
     // MARK: Text colors
 
-    /// Foreground color for plain body text and the typing caret.
+    /// Foreground color for plain body text.
     public var bodyText: NSColor
+    /// Insertion-point ink outside extension spans. A nil value follows
+    /// ``bodyText``. A span can still supply contrasting caret ink through
+    /// ``MarkdownEditorConfiguration/cursorFollowsSpanInk``.
+    public var insertionPointColor: NSColor?
+
+    /// Optional foreground for the plain paragraph containing the focused insertion point.
+    /// Inline marks and structured blocks retain their own styles.
+    public var editingParagraphText: NSColor?
+
+    var resolvedInsertionPointColor: NSColor { insertionPointColor ?? bodyText }
     /// Foreground color for de-emphasized text and most syntax markers.
     /// Defaults to `secondaryLabelColor` so it tracks the system style.
     public var mutedText: NSColor
@@ -176,9 +186,13 @@ public struct MarkdownEditorTheme: Sendable {
         inlineCodeBackground: NSColor? = nil,
         tableHeaderBackground: NSColor? = nil,
         tableRowBackground: NSColor? = nil,
-        tableRule: NSColor? = nil
+        tableRule: NSColor? = nil,
+        insertionPointColor: NSColor? = nil,
+        editingParagraphText: NSColor? = nil
     ) {
         self.bodyText = bodyText
+        self.insertionPointColor = insertionPointColor
+        self.editingParagraphText = editingParagraphText
         self.mutedText = mutedText
         self.disabledText = disabledText
         self.headingText = headingText
