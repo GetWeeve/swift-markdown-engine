@@ -317,7 +317,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         context.coordinator.onCodeBlockSelectionChange = onCodeBlockSelectionChange
 
         textView.recalcOverscroll(for: scrollView)
-        textView.setPlaceholder(placeholder)
+        textView.setPlaceholder(placeholder, usesFontSmoothing: configuration.paragraph.usesFontSmoothing)
         // Initial reading-column centering; the resize observer below handles later changes.
         if configuration.readingWidth != nil {
             textView.centerReadingColumn(forClipWidth: scrollView.contentView.bounds.width)
@@ -391,7 +391,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
 
         textView.onPasteImage = onPasteImage
         textView.isCursorExcluded = isCursorExcluded
-        textView.setPlaceholder(placeholder)
+        textView.setPlaceholder(placeholder, usesFontSmoothing: configuration.paragraph.usesFontSmoothing)
         // Sync heightBehavior across all three layers (scroll view, text view,
         // coordinator) so a runtime switch fully reconfigures.
         let heightBehaviorChanged = textView.configuration.heightBehavior != configuration.heightBehavior
