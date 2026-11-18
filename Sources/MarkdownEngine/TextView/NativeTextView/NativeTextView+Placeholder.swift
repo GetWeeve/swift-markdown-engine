@@ -19,6 +19,10 @@ final class PlaceholderLabelView: NSView {
         didSet { needsDisplay = true }
     }
 
+    var usesFontSmoothing = true {
+        didSet { if oldValue != usesFontSmoothing { needsDisplay = true } }
+    }
+
     /// Top-left origin to match the flipped text view's first-line position.
     override var isFlipped: Bool { true }
 
@@ -26,6 +30,12 @@ final class PlaceholderLabelView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     override func draw(_ dirtyRect: NSRect) {
+        let context = NSGraphicsContext.current?.cgContext
+        if !usesFontSmoothing {
+            context?.saveGState()
+            context?.setShouldSmoothFonts(false)
+        }
+        defer { if !usesFontSmoothing { context?.restoreGState() } }
         attributedText?.draw(
             with: bounds,
             options: [.usesLineFragmentOrigin, .usesFontLeading]
@@ -36,7 +46,7 @@ final class PlaceholderLabelView: NSView {
 extension NativeTextView {
     /// Install, refresh, or remove the placeholder. Cheap when nothing changed —
     /// called from every `updateNSView`.
-    func setPlaceholder(_ attributed: NSAttributedString?) {
+    func setPlaceholder(_ attributed: NSAttributedString?, usesFontSmoothing: Bool) {
         if let attributed {
             let view: PlaceholderLabelView
             if let existing = placeholderView {
@@ -51,6 +61,7 @@ extension NativeTextView {
                 addSubview(view)
                 placeholderView = view
             }
+            view.usesFontSmoothing = usesFontSmoothing
             let target = placeholderFrame()
             if !view.frame.isApproximatelyEqual(to: target) {
                 view.frame = target
