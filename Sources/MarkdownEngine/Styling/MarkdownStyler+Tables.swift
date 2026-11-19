@@ -149,18 +149,18 @@ extension MarkdownStyler {
         appearance: NSAppearance,
         availableWidth: CGFloat
     ) -> (image: NSImage, rendered: Bool) {
-        let widthKey = Int(availableWidth.rounded())
+        let widthKey = ctx.configuration.table.fillsAvailableWidth ? availableWidth : availableWidth.rounded()
         // The extension registry is part of the key: `==x==` in a cell renders
         // highlighted under one config and literal under another — those must
         // never share a cached image.
         let extensionKey = ctx.configuration.extensionRegistry.fingerprint
-        // The wrapper radius and rule orientation change the rendered pixels,
-        // so they are part of the cache identity like every other rendering
-        // input.
-        let radiusKey = ctx.configuration.table.cornerRadius
-        let verticalRulesKey = ctx.configuration.table.verticalRules ? 1 : 0
+        let style = ctx.configuration.table
+        let paragraph = ctx.configuration.paragraph
+        let smoothing = paragraph.usesFontSmoothing
+        let halfLeading = paragraph.centersBlockLineHeights ? max(0, paragraph.lineHeightExtraSpacing / 2) : 0
+        let layoutKey = "\(style.cornerRadius)|\(style.verticalRules)|\(style.fillsAvailableWidth)|\(style.minimumRowHeight)|\(style.boldHeaders)|\(style.showsRules)|\(String(describing: style.preferredLeadingColumnWidth))|\(smoothing)|\(halfLeading)"
         let key = (themeKeyPrefix(ctx: ctx, appearance: appearance)
-            + "|x\(extensionKey)|w\(widthKey)|r\(radiusKey)|v\(verticalRulesKey)|" + source) as NSString
+            + "|x\(extensionKey)|w\(widthKey)|t\(layoutKey)|" + source) as NSString
         if let cached = tableImageCache.object(forKey: key) {
             return (cached, false)
         }
@@ -173,8 +173,7 @@ extension MarkdownStyler {
             appearance: appearance,
             availableWidth: availableWidth,
             extensions: ctx.configuration.extensions,
-            cornerRadius: ctx.configuration.table.cornerRadius,
-            verticalRules: ctx.configuration.table.verticalRules
+            style: style, usesFontSmoothing: smoothing, halfLeading: halfLeading
         )
         tableImageCache.setObject(image, forKey: key)
         return (image, true)
@@ -470,13 +469,12 @@ extension MarkdownStyler {
         appearance: NSAppearance,
         availableWidth: CGFloat,
         extensions: [any MarkdownExtension] = [],
-        cornerRadius: CGFloat = 0,
-        verticalRules: Bool = true
+        style: TableStyle, usesFontSmoothing: Bool, halfLeading: CGFloat
     ) -> NSImage {
         let columnCount = table.alignments.count
         let cellHPadding: CGFloat = 12
         let cellVPadding: CGFloat = 6
-        let borderWidth: CGFloat = 1
+        let borderWidth: CGFloat = style.showsRules ? 1 : 0
         // Resolve under the real appearance: `.withAlphaComponent()` freezes a dynamic color otherwise.
         func resolved(_ color: NSColor) -> NSColor {
             var result = color
@@ -495,7 +493,7 @@ extension MarkdownStyler {
         // Pre-format every cell so width measurement and drawing share one NSAttributedString.
         let headerCells = table.header.map {
             formattedCellString(
-                $0, baseFont: baseFont, header: true, theme: theme,
+                $0, baseFont: baseFont, header: style.boldHeaders, theme: theme,
                 codeBackgroundColor: codeBackgroundColor, latex: latex,
                 extensions: extensions
             )
@@ -554,7 +552,7 @@ extension MarkdownStyler {
         }
 
         // Distribute the available width:
-        // - everything fits on one line → natural (maximum) widths;
+        // - everything fits on one line → natural widths, or spread the surplus in fill mode;
         // - too wide → shrink to the available width, but never below a
         //   column's longest unbreakable word; the slack above the minimums is
         //   distributed proportionally to each column's (max − min) stretch;
@@ -564,18 +562,42 @@ extension MarkdownStyler {
         let chrome = CGFloat(columnCount) * 2 * cellHPadding
             + CGFloat(columnCount + 1) * borderWidth
         let contentAvailable = availableWidth - chrome
+        var preferredLeading = false
+        if style.fillsAvailableWidth, columnCount > 1, let width = style.preferredLeadingColumnWidth,
+           contentAvailable >= minWidths.reduce(0, +) {
+            let otherMinimums = minWidths.dropFirst().reduce(0, +)
+            let preferred = min(contentAvailable - otherMinimums, max(minWidths[0], width - 2 * cellHPadding))
+            minWidths[0] = preferred
+            maxWidths[0] = preferred
+            preferredLeading = true
+        }
         let sumMax = maxWidths.reduce(0, +)
         let sumMin = minWidths.reduce(0, +)
         var columnWidths = maxWidths
-        if contentAvailable > 0, sumMax > contentAvailable {
-            if sumMin >= contentAvailable {
-                columnWidths = minWidths
-            } else {
-                let extra = contentAvailable - sumMin
-                let totalStretch = sumMax - sumMin
-                columnWidths = zip(minWidths, maxWidths).map { mn, mx in
-                    mn + ((mx - mn) / totalStretch * extra).rounded(.down)
-                }
+        if contentAvailable <= sumMin {
+            // If these floors exceed the container, the horizontal scroller takes over.
+            if style.fillsAvailableWidth || contentAvailable > 0 { columnWidths = minWidths }
+        } else if style.fillsAvailableWidth {
+            let isWrapping = contentAvailable < sumMax
+            let floors = isWrapping ? minWidths : maxWidths
+            var weights = isWrapping ? zip(maxWidths, minWidths).map { $0 - $1 } : maxWidths
+            if preferredLeading { weights[0] = 0 }
+            let totalWeight = weights.reduce(0, +)
+            let surplus = contentAvailable - floors.reduce(0, +)
+            var cumulativeWeight: CGFloat = 0
+            var allocated: CGFloat = 0
+            for index in columnWidths.indices {
+                cumulativeWeight += weights[index]
+                let edge = index == columnWidths.count - 1 ? surplus
+                    : (surplus * cumulativeWeight / totalWeight).rounded(.down)
+                columnWidths[index] = floors[index] + edge - allocated
+                allocated = edge
+            }
+        } else if sumMax > contentAvailable {
+            let extra = contentAvailable - sumMin
+            let totalStretch = sumMax - sumMin
+            columnWidths = zip(minWidths, maxWidths).map { mn, mx in
+                mn + ((mx - mn) / totalStretch * extra).rounded(.down)
             }
         }
 
@@ -598,10 +620,13 @@ extension MarkdownStyler {
             }
         }
 
+        let rowPadding = rowContentHeights.map { height in
+            max(cellVPadding, (style.minimumRowHeight - height) / 2)
+        }
         let totalWidth = columnWidths.reduce(0, +)
             + CGFloat(columnCount) * 2 * cellHPadding
             + CGFloat(columnCount + 1) * borderWidth
-        let totalHeight = rowContentHeights.reduce(0) { $0 + $1 + 2 * cellVPadding }
+        let totalHeight = zip(rowContentHeights, rowPadding).reduce(0) { $0 + $1.0 + 2 * $1.1 }
             + CGFloat(rowCount + 1) * borderWidth
 
         let size = NSSize(width: totalWidth, height: totalHeight)
@@ -615,7 +640,7 @@ extension MarkdownStyler {
         var rowTop = [CGFloat](repeating: 0, count: rowCount + 1)
         rowTop[0] = borderWidth
         for i in 0..<rowCount {
-            rowTop[i + 1] = rowTop[i] + rowContentHeights[i] + 2 * cellVPadding + borderWidth
+            rowTop[i + 1] = rowTop[i] + rowContentHeights[i] + 2 * rowPadding[i] + borderWidth
         }
 
         let alignments = table.alignments
@@ -623,7 +648,7 @@ extension MarkdownStyler {
         let rowFill = theme.tableRowBackground.map(resolved)
 
         // Clamp so tiny tables can't invert the rounded path.
-        let radius = max(0, min(cornerRadius, min(size.width, size.height) / 2 - borderWidth))
+        let radius = max(0, min(style.cornerRadius, min(size.width, size.height) / 2 - borderWidth))
         let outerRect = NSRect(
             x: borderWidth / 2,
             y: borderWidth / 2,
@@ -651,14 +676,14 @@ extension MarkdownStyler {
                 x: borderWidth,
                 y: borderWidth,
                 width: size.width - 2 * borderWidth,
-                height: rowContentHeights[0] + 2 * cellVPadding
+                height: rowContentHeights[0] + 2 * rowPadding[0]
             )).fill()
 
             // Body row fill — everything below the header, so the rule band
             // between header and body is covered too; the interior rules and
             // outer border stroke on top of it afterwards.
             if let rowFill {
-                let bodyTop = borderWidth + rowContentHeights[0] + 2 * cellVPadding
+                let bodyTop = borderWidth + rowContentHeights[0] + 2 * rowPadding[0]
                 rowFill.setFill()
                 NSBezierPath(rect: NSRect(
                     x: borderWidth,
@@ -676,7 +701,7 @@ extension MarkdownStyler {
             borderColor.setStroke()
             let separators = NSBezierPath()
             separators.lineWidth = borderWidth
-            if verticalRules {
+            if style.verticalRules {
                 for i in 1..<columnCount {
                     let x = columnLeft[i] - borderWidth / 2
                     separators.move(to: NSPoint(x: x, y: 0))
@@ -688,7 +713,7 @@ extension MarkdownStyler {
                 separators.move(to: NSPoint(x: 0, y: y))
                 separators.line(to: NSPoint(x: size.width, y: y))
             }
-            separators.stroke()
+            if style.showsRules { separators.stroke() }
 
             if radius > 0 { NSGraphicsContext.restoreGraphicsState() }
 
@@ -696,7 +721,14 @@ extension MarkdownStyler {
             // the rounded corners.
             borderColor.setStroke()
             outer.lineWidth = borderWidth
-            outer.stroke()
+            if style.showsRules { outer.stroke() }
+
+            let textContext = NSGraphicsContext.current?.cgContext
+            if !usesFontSmoothing {
+                textContext?.saveGState()
+                textContext?.setShouldSmoothFonts(false)
+            }
+            defer { if !usesFontSmoothing { textContext?.restoreGState() } }
 
             func drawCell(_ s: NSAttributedString, col: Int, row: Int) {
                 guard col < columnCount else { return }
@@ -718,9 +750,12 @@ extension MarkdownStyler {
                     value: paragraph,
                     range: NSRange(location: 0, length: aligned.length)
                 )
+                // A minimum-height row has room for the reader's centered baseline.
+                // Keep the full drawn extent inside its measured padding.
+                let leading = min(halfLeading, rowPadding[row] - cellVPadding)
                 let drawRect = NSRect(
                     x: cellLeft,
-                    y: rowTop[row] + cellVPadding,
+                    y: rowTop[row] + rowPadding[row] + leading,
                     width: cellContentWidth,
                     height: rowContentHeights[row]
                 )
@@ -745,6 +780,11 @@ extension MarkdownStyler {
     static func effectiveContainerWidth(for ctx: StylingContext) -> CGFloat {
         if let container = ctx.layoutBridge?.firstTextContainer {
             let raw = container.size.width
+            if ctx.configuration.table.fillsAvailableWidth, ctx.configuration.readingWidth != nil,
+               let view = container.textView, let clip = view.enclosingScrollView?.contentView {
+                let visible = clip.bounds.width - 2 * view.textContainerInset.width
+                if visible > 0, raw > 0 { return min(raw, visible) }
+            }
             if raw.isFinite, raw > 0, raw < 100_000 { return raw }
             if let textView = container.textView {
                 let inset = textView.textContainerInset

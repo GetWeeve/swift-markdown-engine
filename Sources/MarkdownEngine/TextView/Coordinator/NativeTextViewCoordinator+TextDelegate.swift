@@ -207,7 +207,8 @@ extension NativeTextViewCoordinator {
         ] + editedParagraphs
         // A multiline paste can place the caret far from the start of its edit.
         // The adjacent list item may now have gained or lost a neighboring item or prose block.
-        if configuration.lists.itemSpacing != nil || configuration.lists.adjacentParagraphSpacing != nil {
+        if configuration.lists.itemSpacing != nil || configuration.lists.adjacentParagraphSpacing != nil
+            || configuration.lists.blockSpacing != nil {
             if let start = editedParagraphs.first?.location, start > 0 {
                 paragraphCandidates.append(fullText.paragraphRange(for: NSRange(location: start - 1, length: 0)))
             }

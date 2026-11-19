@@ -53,6 +53,23 @@ struct TableImageCacheTests {
         #expect(plain.rendered, "plain-config table must not reuse the extension-config image")
     }
 
+    @Test func everyTableLayoutOptionParticipatesInTheCacheKey() throws {
+        let source = "| Layout variants | Value |\n|---|---|\n| Default | Same source |"
+        let parsed = try #require(MarkdownStyler.parseTableSource(source))
+        let appearance = try #require(NSAppearance(named: .aqua))
+        let styles: [TableStyle] = [.default, .init(fillsAvailableWidth: true), .init(boldHeaders: false),
+                                   .init(minimumRowHeight: 40), .init(showsRules: false), .init(verticalRules: false),
+                                   .init(cornerRadius: 4), .init(preferredLeadingColumnWidth: 86)]
+        var identities = Set<ObjectIdentifier>()
+        for style in styles {
+            let ctx = makeContext(for: source, configuration: .init(table: style))
+            let rendered = MarkdownStyler.tableImage(for: source, parsed: parsed, ctx: ctx, appearance: appearance, availableWidth: 296)
+            let cached = MarkdownStyler.tableImage(for: source, parsed: parsed, ctx: ctx, appearance: appearance, availableWidth: 296)
+            #expect(identities.insert(ObjectIdentifier(rendered.image)).inserted)
+            #expect(rendered.image === cached.image)
+        }
+    }
+
     @Test func secondRequestIsServedFromCache() throws {
         let source = "| alpha | beta |\n|---|---|\n| 1 | 2 |"
         let parsed = try #require(MarkdownStyler.parseTableSource(source))

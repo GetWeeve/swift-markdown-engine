@@ -444,6 +444,10 @@ public struct ListStyle: Sendable {
     /// Wrapped lines keep their line height, and the last item uses the body
     /// paragraph spacing. With `nil`, all items inherit body paragraph spacing.
     public var itemSpacing: CGFloat?
+    /// Space before the first item and after the last item in a list block.
+    /// A directly adjacent paragraph can override this via ``adjacentParagraphSpacing``.
+    /// With nil, the first item has no extra space above and the last inherits paragraph spacing.
+    public var blockSpacing: CGFloat?
     /// Space before or after a list directly adjoining a prose paragraph.
     /// An intervening blank line keeps its own height. With `nil`, the list
     /// and its neighboring paragraphs use their usual paragraph metrics.
@@ -514,7 +518,8 @@ public struct ListStyle: Sendable {
         orderedMarkerStyles: [OrderedMarkerStyle] = [.numeric],
         bulletDiameter: CGFloat? = nil,
         itemSpacing: CGFloat? = nil,
-        adjacentParagraphSpacing: CGFloat? = nil
+        adjacentParagraphSpacing: CGFloat? = nil,
+        blockSpacing: CGFloat? = nil
     ) {
         self.helpersEnabled = helpersEnabled
         self.autoClosePairsEnabled = autoClosePairsEnabled
@@ -527,6 +532,7 @@ public struct ListStyle: Sendable {
         self.orderedMarkerStyles = orderedMarkerStyles
         self.bulletDiameter = bulletDiameter
         self.itemSpacing = itemSpacing
+        self.blockSpacing = blockSpacing
         self.adjacentParagraphSpacing = adjacentParagraphSpacing
     }
 
@@ -778,7 +784,7 @@ public struct BlockquoteStyle: Sendable {
 // MARK: - Tables
 
 /// GFM table wrapper rendering knobs.
-public struct TableStyle: Sendable {
+public struct TableStyle: Equatable, Sendable {
     /// Corner radius of the rendered table's outer wrapper. The interior
     /// painting (header fill, separator rules) is clipped to the rounded
     /// shape and the outer border rule is stroked along the rounded path,
@@ -793,9 +799,38 @@ public struct TableStyle: Sendable {
     /// inner width, and column sizing and cell padding are unchanged.
     public var verticalRules: Bool
 
-    public init(cornerRadius: CGFloat = 0, verticalRules: Bool = true) {
+    /// Grow columns proportionally to their unwrapped content when the table has spare room.
+    /// Narrow containers still wrap cells or scroll horizontally for unbreakable content.
+    public var fillsAvailableWidth: Bool
+
+    /// Minimum height of a row excluding its rules. Short rows center their text
+    /// vertically. Wrapped content can grow beyond the minimum.
+    public var minimumRowHeight: CGFloat
+
+    /// Draw table headers in bold. Inline emphasis remains available in every cell.
+    public var boldHeaders: Bool
+
+    /// Paint and reserve space for the border and separators. Disable for tables
+    /// whose header and body are distinguished entirely by their backgrounds.
+    public var showsRules: Bool
+
+    /// Preferred first column width, including its cell padding, in a filled
+    /// table with multiple columns. Unbreakable words set the lower limit;
+    /// later columns share the remaining width according to their content.
+    public var preferredLeadingColumnWidth: CGFloat?
+
+    public init(
+        cornerRadius: CGFloat = 0, verticalRules: Bool = true,
+        fillsAvailableWidth: Bool = false, minimumRowHeight: CGFloat = 0,
+        boldHeaders: Bool = true, showsRules: Bool = true, preferredLeadingColumnWidth: CGFloat? = nil
+    ) {
         self.cornerRadius = max(0, cornerRadius)
         self.verticalRules = verticalRules
+        self.fillsAvailableWidth = fillsAvailableWidth
+        self.minimumRowHeight = max(0, minimumRowHeight)
+        self.boldHeaders = boldHeaders
+        self.showsRules = showsRules
+        self.preferredLeadingColumnWidth = preferredLeadingColumnWidth
     }
 
     public static let `default` = TableStyle()

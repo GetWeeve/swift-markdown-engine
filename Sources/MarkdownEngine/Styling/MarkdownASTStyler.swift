@@ -865,9 +865,9 @@ enum MarkdownASTStyler {
             let before = ctx.paragraphListBoundaries.contains(range.location) ? lists.adjacentParagraphSpacing : nil
             let after = ctx.paragraphListBoundaries.contains(NSMaxRange(range)) ? lists.adjacentParagraphSpacing : nil
             for (index, item) in items.enumerated() {
-                let spacing = index + 1 < items.count ? lists.itemSpacing : after
+                let spacing = index + 1 < items.count ? lists.itemSpacing : (after ?? lists.blockSpacing)
                 styleListItem(item, displayNumber: ctx.orderedDisplayNumbers[item.marker.location],
-                              spacingBefore: index == 0 ? (before ?? 0) : 0, spacingAfter: spacing ?? ctx.baseParagraphSpacing,
+                              spacingBefore: index == 0 ? (before ?? lists.blockSpacing ?? 0) : 0, spacingAfter: spacing ?? ctx.baseParagraphSpacing,
                               ctx: ctx, into: &attrs)
                 styleInlines(item.inlines, font: font, ctx: ctx, into: &attrs)
             }

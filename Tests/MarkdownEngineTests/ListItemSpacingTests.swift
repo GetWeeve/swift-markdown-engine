@@ -59,9 +59,9 @@ struct ListItemSpacingTests {
     @Test func mountedEditorAdoptsSpacingAndRestoresInheritedMetrics() throws {
         _ = NSApplication.shared
         let text = "Intro\n- first\n- last\nTail\n\n- solo"
-        func wrapper(item: CGFloat?, adjacent: CGFloat?) -> NativeTextViewWrapper {
+        func wrapper(item: CGFloat?, adjacent: CGFloat?, block: CGFloat? = nil) -> NativeTextViewWrapper {
             NativeTextViewWrapper(text: .constant(text),
-                configuration: MarkdownEditorConfiguration(lists: ListStyle(itemSpacing: item, adjacentParagraphSpacing: adjacent)),
+                configuration: MarkdownEditorConfiguration(lists: ListStyle(itemSpacing: item, adjacentParagraphSpacing: adjacent, blockSpacing: block)),
                 documentId: "spacing-fixture", isEditable: false)
         }
         let host = NSHostingView(rootView: wrapper(item: nil, adjacent: nil))
@@ -77,14 +77,14 @@ struct ListItemSpacingTests {
         }
         let view = try #require(nativeView(host))
         let initial = try style("first", in: view).paragraphSpacing
-        for (item, adjacent) in [(CGFloat(6), CGFloat(20)), (nil, nil)] as [(CGFloat?, CGFloat?)] {
-            host.rootView = wrapper(item: item, adjacent: adjacent)
+        for (item, adjacent, block) in [(6, 20, 4), (0, nil, 4), (nil, nil, nil)] as [(CGFloat?, CGFloat?, CGFloat?)] {
+            host.rootView = wrapper(item: item, adjacent: adjacent, block: block)
             host.layoutSubtreeIfNeeded()
-            #expect(try style("first", in: view).paragraphSpacingBefore == (adjacent ?? 0))
+            #expect(try style("first", in: view).paragraphSpacingBefore == (adjacent ?? block ?? 0))
             #expect(try style("first", in: view).paragraphSpacing == (item ?? initial))
-            #expect(try style("last", in: view).paragraphSpacing == (adjacent ?? initial))
-            #expect(try style("solo", in: view).paragraphSpacingBefore == 0)
-            #expect(try style("solo", in: view).paragraphSpacing == initial)
+            #expect(try style("last", in: view).paragraphSpacing == (adjacent ?? block ?? initial))
+            #expect(try style("solo", in: view).paragraphSpacingBefore == (block ?? 0))
+            #expect(try style("solo", in: view).paragraphSpacing == (block ?? initial))
             #expect(nativeView(host) === view)
         }
     }
