@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   raw-markdown flavor still round-trips byte-exact.
 
 ### Fixed
+- Fitted editors reserve the full last line of centered text when measuring the space before the next view.
 - A drag of the selection, and the services menu, no longer serialize the
   storage's styled raw markdown straight out of the text view. Both ask for
   the selection one type at a time through `writeSelection(to:type:)`, which

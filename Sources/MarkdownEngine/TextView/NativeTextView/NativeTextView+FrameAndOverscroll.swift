@@ -184,6 +184,20 @@ extension NativeTextView {
             }
         }
 
+        // TextKit uses lineSpacing between lines. A fitted centered paragraph also
+        // owns that share of leading below its last line. Preserve a taller
+        // attachment's measured extent and the normalized trailing empty line.
+        if configuration.heightBehavior == .fitsContent,
+           configuration.paragraph.centersExtraLineHeight || configuration.paragraph.centersBlockLineHeights,
+           segmentMaxY > 0, let storage = textStorage, storage.length > 0 {
+            let last = storage.length - 1
+            let character = storage.mutableString.character(at: last)
+            if ![0x0A, 0x0D, 0x2028, 0x2029].contains(character),
+               let style = storage.attribute(.paragraphStyle, at: last, effectiveRange: nil) as? NSParagraphStyle {
+                rawHeight = max(rawHeight, segmentMaxY + max(0, style.lineSpacing))
+            }
+        }
+
         return max(ceil(rawHeight + (textContainerInset.height * 2)), minimumContentHeight)
     }
 
