@@ -89,6 +89,59 @@ struct ListItemSpacingTests {
         }
     }
 
+    @Test func mountedTypographyChangesKeepContentAndSelection() throws {
+        _ = NSApplication.shared
+        let text = "## Heading\nProse **strong**\n\n- item\nTail"
+        func wrapper(_ enabled: Bool, proseExtra: CGFloat = 4, id: String = "type-fixture") -> NativeTextViewWrapper {
+            NativeTextViewWrapper(text: .constant(text), configuration: MarkdownEditorConfiguration(
+                lists: ListStyle(extraLineHeight: 10),
+                headings: HeadingStyle(fontName: "Georgia", fontMultipliers: [1.5], lineHeights: [40]),
+                paragraph: ParagraphStyle(lineHeightExtraSpacing: proseExtra,
+                                          strongEmphasisFontName: enabled ? "AvenirNext-DemiBold" : nil,
+                                          centersBlockLineHeights: enabled)
+            ), documentId: id)
+        }
+        let host = NSHostingView(rootView: wrapper(false))
+        let window = NSWindow(contentRect: NSMakeRect(0, 0, 400, 200), styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.close() }
+        func textView(in node: NSView) -> NSTextView? {
+            node as? NSTextView ?? node.subviews.lazy.compactMap(textView).first
+        }
+        host.layoutSubtreeIfNeeded()
+        let view = try #require(textView(in: host) as? NativeTextView)
+        let selection = (text as NSString).range(of: "Prose")
+        view.setSelectedRange(selection)
+        let strong = (text as NSString).range(of: "strong")
+        for enabled in [true, false] {
+            host.rootView = wrapper(enabled)
+            host.layoutSubtreeIfNeeded()
+            let prose = try style("Prose", in: view)
+            let list = try style("item", in: view)
+            #expect(prose.paragraphSpacingBefore == (enabled ? -2 : 0))
+            #expect(list.paragraphSpacingBefore == (enabled ? -5 : 0))
+            let face = try #require(view.textStorage?.attribute(.font, at: strong.location, effectiveRange: nil) as? NSFont)
+            #expect((face.fontName == "AvenirNext-DemiBold") == enabled)
+            #expect(view.string == text && view.selectedRange() == selection)
+            #expect(textView(in: host) === view)
+        }
+        host.rootView = wrapper(true, proseExtra: 4)
+        host.layoutSubtreeIfNeeded()
+        host.rootView = wrapper(true, proseExtra: 10)
+        host.layoutSubtreeIfNeeded()
+        for word in ["Prose", "Tail"] {
+            #expect(try style(word, in: view).lineSpacing == 5)
+        }
+        #expect(view.string == text && view.selectedRange() == selection)
+        host.rootView = wrapper(false, id: "second-type-fixture")
+        host.layoutSubtreeIfNeeded()
+        #expect(try style("Prose", in: view).paragraphSpacingBefore == 0)
+        let secondFace = try #require(view.textStorage?.attribute(.font, at: strong.location, effectiveRange: nil) as? NSFont)
+        #expect(secondFace.fontName != "AvenirNext-DemiBold")
+        #expect(view.string == text)
+    }
+
     private func style(_ word: String, in view: NativeTextView) throws -> NSParagraphStyle {
         let position = (view.string as NSString).range(of: word)
         try #require(position.location != NSNotFound)

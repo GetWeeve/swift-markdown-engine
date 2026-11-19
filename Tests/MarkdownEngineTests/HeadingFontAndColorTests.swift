@@ -51,6 +51,38 @@ struct HeadingFontAndColorTests {
         )
     }
 
+    @Test("strong body face applies to prose and list items, composes with italic, and leaves headings alone")
+    func strongFaceRespectsItsTextContext() throws {
+        let text = "# **Title**\n\n**First** and ***both*** plus **one *nested* word**\n\n- **Second**"
+        let strong = "AvenirNext-DemiBold"
+        let config = MarkdownEditorConfiguration(
+            headings: HeadingStyle(fontName: headingFace),
+            paragraph: ParagraphStyle(strongEmphasisFontName: strong)
+        )
+        let attributes = style(text, configuration: config)
+        func at(_ word: String) throws -> NSFont {
+            try #require(font(in: attributes, at: (text as NSString).range(of: word).location))
+        }
+        #expect(try at("First").fontName == strong)
+        #expect(try at("Second").fontName == strong)
+        #expect(try at("First").pointSize == base)
+        #expect(try at("both").fontDescriptor.symbolicTraits.contains(.italic))
+        #expect(try at("both").fontName == "AvenirNext-DemiBoldItalic")
+        #expect(try at("nested").fontName == "AvenirNext-DemiBoldItalic")
+        #expect(try at("Title").familyName == "Menlo")
+        #expect(try at("Title").fontDescriptor.symbolicTraits.contains(.bold))
+    }
+
+    @Test("missing and unconfigured strong faces use the normal bold trait")
+    func unavailableStrongFaceKeepsDefault() throws {
+        let text = "**text**"
+        let plain = try #require(font(in: style(text), at: 2))
+        let config = MarkdownEditorConfiguration(paragraph: ParagraphStyle(strongEmphasisFontName: "Nonexistent-Strong-Test"))
+        let fallback = try #require(font(in: style(text, configuration: config), at: 2))
+        #expect(plain.fontDescriptor.symbolicTraits.contains(.bold))
+        #expect(fallback == plain)
+    }
+
     // MARK: - HeadingStyle.fontName
 
     @Test("headings.fontName renders headings in that face at the multiplied size")

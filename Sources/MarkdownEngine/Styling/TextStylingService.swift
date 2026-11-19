@@ -31,6 +31,11 @@ struct TextStylingService {
     ) -> (font: NSFont, style: NSMutableParagraphStyle) {
         let baseFont = NSFont(name: fontName, size: fontSize) ?? NSFont.systemFont(ofSize: fontSize)
         let defaultLineHeight = layoutBridgeDefaultLineHeight(for: baseFont, using: layoutBridge)
+        return (baseFont, makeBaseParagraphStyle(lineHeight: defaultLineHeight, configuration: configuration))
+    }
+
+    static func makeBaseParagraphStyle(lineHeight defaultLineHeight: CGFloat,
+                                       configuration: MarkdownEditorConfiguration) -> NSMutableParagraphStyle {
         let paragraph = NSMutableParagraphStyle()
         let extra = configuration.paragraph.lineHeightExtraSpacing
         let trailing = configuration.paragraph.trailingLineSpacing(for: extra)
@@ -44,7 +49,7 @@ struct TextStylingService {
         let perLevel = configuration.lists.indentPerLevel
         paragraph.tabStops = (1...24).map { NSTextTab(textAlignment: .left, location: CGFloat($0) * perLevel) }
         paragraph.defaultTabInterval = 0
-        return (baseFont, paragraph)
+        return paragraph
     }
 
     static func restyle(
