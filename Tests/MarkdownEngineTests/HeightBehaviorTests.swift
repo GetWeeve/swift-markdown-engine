@@ -15,6 +15,7 @@
 //
 
 import AppKit
+import SwiftUI
 import Testing
 @testable import MarkdownEngine
 
@@ -810,5 +811,67 @@ struct FullRuntimeReconfigurationTests {
         // is the real content height, used by clampToInsets.)
         let scrollsTotal: CGFloat = 50 + stack.textView.scrollableContentHeight
         #expect(stack.container.scrollableContentHeight == scrollsTotal)
+    }
+}
+
+@MainActor
+struct CenteredFittedLineTests {
+    @Test(arguments: ["One line", "- First\n- Second\n- Last", String(repeating: "Wrapped text ", count: 16)])
+    func centeringKeepsTheCompleteLastLineBox(_ text: String) throws {
+        let natural = try measuredHeight(text, centered: false)
+        let centered = try measuredHeight(text, centered: true)
+        #expect(centered == natural)
+        let scrolling = try measuredHeight(text, centered: true, behavior: .scrolls)
+        #expect(centered - scrolling == 2)
+    }
+
+    @Test(arguments: [
+        "", "Text\n", "Text\r", "Text\r\n", "Text\u{2028}", "Text\u{2029}", "- Item\n",
+        "# Heading", "| Item | Qty |\n| --- | --- |\n| Seeds | 2 |", "```\ncode\n```",
+    ])
+    func otherEndingsKeepTheirNativeExtent(_ text: String) throws {
+        let fitted = try measuredHeight(text, centered: true, centersBlocks: true)
+        let scrolling = try measuredHeight(text, centered: true, centersBlocks: true, behavior: .scrolls)
+        #expect(fitted == scrolling)
+    }
+
+    private func measuredHeight(
+        _ text: String,
+        centered: Bool,
+        centersBlocks: Bool = false,
+        behavior: MarkdownEditorConfiguration.HeightBehavior = .fitsContent
+    ) throws -> CGFloat {
+        _ = NSApplication.shared
+        let config = MarkdownEditorConfiguration(
+            lists: ListStyle(extraLineHeight: 4, itemSpacing: 6),
+            headings: HeadingStyle(fontMultipliers: [1.5], topSpacingEm: [0], lineHeights: [40]),
+            paragraph: ParagraphStyle(
+                spacingFactor: 0, lineHeightExtraSpacing: 4,
+                centersExtraLineHeight: centered, centersBlockLineHeights: centersBlocks
+            ),
+            heightBehavior: behavior
+        )
+        let view = NativeTextViewWrapper(
+            text: .constant(text), configuration: config,
+            fontName: "AvenirNext-Regular", fontSize: 13, documentId: UUID().uuidString, isEditable: false
+        )
+        let host = NSHostingView(rootView: view)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 300),
+            styleMask: .borderless, backing: .buffered, defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.close() }
+        window.displayIfNeeded()
+        host.layoutSubtreeIfNeeded()
+        func findEditor(in node: NSView) -> NativeTextView? {
+            if let editor = node as? NativeTextView { return editor }
+            return node.subviews.lazy.compactMap { findEditor(in: $0) }.first
+        }
+        let editor = try #require(findEditor(in: host))
+        let measured = editor.measuredBaseContentHeight(minimumHeight: 1, forceFullLayout: true)
+        #expect(measured > 1)
+        return measured
     }
 }
