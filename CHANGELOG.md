@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Tables can fill the visible column and use a preferred leading column width, minimum row height, regular-weight headers and borderless row backgrounds. List blocks can set their outer paragraph spacing independently of the space between items.
+
 - Editors can center heading, prose and list line boxes across block boundaries and select a custom body strong-emphasis face.
 - `ListStyle.itemSpacing` and `adjacentParagraphSpacing` independently control space between list items and at list/prose boundaries.
 - `MarkdownExtension.plainText(source:childrenText:)`: the plain-text

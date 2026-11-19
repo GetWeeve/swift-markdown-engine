@@ -439,7 +439,11 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         // and no rebuild is needed for it to take effect.
         let fontChanged = (context.coordinator.fontName != fontName) || (context.coordinator.fontSize != fontSize)
         let spacingChanged = context.coordinator.configuration.lists.itemSpacing != configuration.lists.itemSpacing
+            || context.coordinator.configuration.lists.blockSpacing != configuration.lists.blockSpacing
             || context.coordinator.configuration.lists.adjacentParagraphSpacing != configuration.lists.adjacentParagraphSpacing
+        let tableChanged = context.coordinator.configuration.table != configuration.table
+        textView.configuration.table = configuration.table
+        context.coordinator.configuration.table = configuration.table
         let typographyChanged = context.coordinator.configuration.paragraph != configuration.paragraph
         textView.configuration.paragraph = configuration.paragraph
         context.coordinator.configuration.paragraph = configuration.paragraph
@@ -456,21 +460,24 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
             textView.configuration.extensions = configuration.extensions
             context.coordinator.cachedParsedDocument = nil
         }
-        // A font or document switch already styles the complete incoming storage.
-        if !fontChanged, !isNodeSwitch, extensionsChanged || spacingChanged || typographyChanged {
-            let fullRange = NSRange(location: 0, length: (textView.string as NSString).length)
-            if fullRange.length > 0 {
-                context.coordinator.restyleParagraphs([fullRange], in: textView)
-            }
-        }
         // Reading column centers by POSITION (container subview), so the text inset is constant.
         let desiredTextInset = NSSize(
             width: configuration.textInsets.horizontal,
             height: configuration.textInsets.vertical
         )
-        if abs(textView.textContainerInset.width - desiredTextInset.width) > 0.5
+        let horizontalInsetChanged = abs(textView.textContainerInset.width - desiredTextInset.width) > 0.5
+        if horizontalInsetChanged
             || abs(textView.textContainerInset.height - desiredTextInset.height) > 0.5 {
             textView.textContainerInset = desiredTextInset
+        }
+        // A font or document switch already styles the complete incoming storage.
+        if !fontChanged, !isNodeSwitch, extensionsChanged || spacingChanged || typographyChanged || tableChanged {
+            let fullRange = NSRange(location: 0, length: (textView.string as NSString).length)
+            if fullRange.length > 0 {
+                context.coordinator.restyleParagraphs([fullRange], in: textView)
+            }
+        } else if !fontChanged, !isNodeSwitch, horizontalInsetChanged, configuration.table.fillsAvailableWidth {
+            textView.restyleTableParagraphsForWidthChange()
         }
         // Refresh services/theme when the embedder hands us a new configuration
         // (e.g. when the available wiki-link targets change). Cheap pointer-/

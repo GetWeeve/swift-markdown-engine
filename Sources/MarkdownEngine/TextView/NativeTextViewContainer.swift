@@ -104,9 +104,19 @@ final class NativeTextViewContainer: NSView {
     }
 
     override func setFrameSize(_ newSize: NSSize) {
+        let oldWidth = bounds.width
         super.setFrameSize(newSize)
         // Width came from the scroll view's clip view (autoresizing); propagate it.
         restack(propagateWidth: true)
+        // Prose retains its fixed reading column, while a filled table stays
+        // within the visible portion when the viewport is narrower.
+        if let textView, textView.configuration.readingWidth != nil, textView.configuration.table.fillsAvailableWidth,
+           abs(min(oldWidth, textView.readingColumnWidth) - min(newSize.width, textView.readingColumnWidth)) > 0.5 {
+            DispatchQueue.main.async { [weak textView] in
+                textView?.restyleTableParagraphsForWidthChange()
+                textView?.updateWideTableOverlays()
+            }
+        }
     }
 }
 
