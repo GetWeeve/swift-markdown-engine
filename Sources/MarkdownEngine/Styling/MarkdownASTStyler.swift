@@ -65,10 +65,22 @@ enum MarkdownASTStyler {
         let sourceBlocks = precomputedBlocks ?? BlockParser.parse(text, registry: configuration.extensionRegistry)
         let blocks = DocumentAST.parse(text, scopedRanges: scopedRanges, precomputedBlocks: sourceBlocks,
                                        registry: configuration.extensionRegistry)
+        let bodyParagraph: NSParagraphStyle?
+        if configuration.paragraph.centersBlockLineHeights {
+            let style = TextStylingService.makeBaseParagraphStyle(
+                lineHeight: layoutBridgeDefaultLineHeight(for: baseFont), configuration: configuration
+            )
+            configuration.paragraph.balanceBlockLeading(in: style)
+            bodyParagraph = style
+        } else {
+            bodyParagraph = nil
+        }
         let ctx = Ctx(
             ns: ns,
             fontName: fontName,
             baseFont: baseFont,
+            bodyParagraph: bodyParagraph,
+            strongBodyFont: configuration.paragraph.strongEmphasisFontName.flatMap { NSFont(name: $0, size: fontSize) },
             baseLineHeight: baseLineHeight,
             baseParagraphSpacing: baseParagraphSpacing,
             codeFont: codeFont,
@@ -538,6 +550,7 @@ enum MarkdownASTStyler {
         ps.lineSpacing = trailing
         ps.paragraphSpacing = spacingAfter
         ps.paragraphSpacingBefore = spacingBefore
+        ctx.config.paragraph.balanceBlockLeading(in: ps)
         ps.tabStops = []
         if let gap = ctx.config.lists.markerTextGap,
            item.contentRange.location - 1 >= NSMaxRange(item.marker) {
@@ -736,6 +749,8 @@ enum MarkdownASTStyler {
         let ns: NSString
         let fontName: String
         let baseFont: NSFont
+        let bodyParagraph: NSParagraphStyle?
+        var strongBodyFont: NSFont?
         let baseLineHeight: CGFloat
         let baseParagraphSpacing: CGFloat
         let codeFont: NSFont
@@ -793,6 +808,9 @@ enum MarkdownASTStyler {
     private static func styleBlock(_ block: BlockNode, font: NSFont, ctx: Ctx, into attrs: inout [StyledRange]) {
         switch block {
         case .paragraph(let range, let inlines):
+            if let style = ctx.bodyParagraph {
+                attrs.append((ctx.ns.paragraphRange(for: range), [.paragraphStyle: style]))
+            }
             if let editing = ctx.editingParagraph, let ink = ctx.theme.editingParagraphText {
                 let overlap = NSIntersectionRange(editing, range)
                 if overlap.length > 0 { attrs.append((overlap, [.foregroundColor: ink])) }
@@ -812,16 +830,21 @@ enum MarkdownASTStyler {
             let lineHeight = ctx.config.headings.lineHeight(for: level)
                 ?? ceil(headingFont.ascender - headingFont.descender + headingFont.leading) + 1
             let headingPara = NSMutableParagraphStyle()
+            let baselineOffset = ctx.config.paragraph.centersBlockLineHeights && ctx.config.headings.lineHeight(for: level) != nil
+                ? max(0, ceil((lineHeight - headingFont.ascender + headingFont.descender) / 2)) : 0
+            headingPara.lineSpacing = baselineOffset
             headingPara.minimumLineHeight = lineHeight
             headingPara.maximumLineHeight = lineHeight
             headingPara.paragraphSpacingBefore = headingFont.pointSize * ctx.config.headings.topSpacingEm(for: level)
             headingPara.paragraphSpacing = ctx.config.headings.paragraphSpacing ?? ctx.baseParagraphSpacing
+            ctx.config.paragraph.balanceBlockLeading(in: headingPara)
             attrs.append((ctx.ns.paragraphRange(for: range), [.paragraphStyle: headingPara]))
             // theme.headingText paints the whole heading line; the marker loop
             // and the inline descent below both append LATER, so `#` glyphs
             // keep headingMarker and links / code keep their own ink — the
             // same later-range-wins layering the bodyText default relies on.
             var headingAttrs: [NSAttributedString.Key: Any] = [.font: headingFont]
+            if baselineOffset > 0 { headingAttrs[.baselineOffset] = baselineOffset }
             if let headingText = ctx.theme.headingText {
                 headingAttrs[.foregroundColor] = headingText
             }
@@ -829,7 +852,9 @@ enum MarkdownASTStyler {
             for marker in markers {
                 attrs.append((marker, [.foregroundColor: ctx.theme.headingMarker]))
             }
-            styleInlines(inlines, font: headingFont, ctx: ctx, into: &attrs)
+            var headingContext = ctx
+            headingContext.strongBodyFont = nil
+            styleInlines(inlines, font: headingFont, ctx: headingContext, into: &attrs)
 
         case .blockquote(let range, let inlines):
             styleBlockquote(range: range, ctx: ctx, into: &attrs)
@@ -1032,8 +1057,21 @@ enum MarkdownASTStyler {
                 break
 
             case .emphasis(let kind, let range, let markers, let children):
-                let composed = adding(traits(for: kind), to: font)
-                attrs.append((content(of: markers), [.font: composed]))
+                let traits = traits(for: kind)
+                let composed: NSFont
+                if let strong = ctx.strongBodyFont, traits.contains(.bold) || font == strong {
+                    let italic = traits.contains(.italic) || font.fontDescriptor.symbolicTraits.contains(.italic)
+                    composed = italic ? italicFace(of: strong) : strong
+                } else {
+                    composed = adding(traits, to: font)
+                }
+                var emphasis: [NSAttributedString.Key: Any] = [.font: composed]
+                if ctx.strongBodyFont != nil, traits.contains(.italic) || font.fontDescriptor.symbolicTraits.contains(.italic),
+                   !composed.fontDescriptor.symbolicTraits.contains(.italic) {
+                    // Upright-only families still need a visible italic treatment.
+                    emphasis[.obliqueness] = 0.2
+                }
+                attrs.append((content(of: markers), emphasis))
                 if ctx.isActive(range) {
                     for marker in markers { attrs.append((marker, [.foregroundColor: ctx.theme.mutedText])) }
                 }
@@ -1240,6 +1278,19 @@ enum MarkdownASTStyler {
         case .bold: return .bold
         case .boldItalic: return [.bold, .italic]
         }
+    }
+
+    /// A symbolic bold/italic request alone can promote a semibold face to bold.
+    /// Match the original numeric weight when the family supplies an italic cut.
+    private static func italicFace(of face: NSFont) -> NSFont {
+        guard let family = face.familyName,
+              let traits = face.fontDescriptor.object(forKey: .traits) as? [NSFontDescriptor.TraitKey: Any],
+              let weight = traits[.weight] else { return adding(.italic, to: face) }
+        let descriptor = NSFontDescriptor(fontAttributes: [
+            .family: family, .traits: [NSFontDescriptor.TraitKey.weight: weight,
+                                      .symbolic: NSFontDescriptor.SymbolicTraits.italic.rawValue]
+        ])
+        return NSFont(descriptor: descriptor, size: face.pointSize) ?? adding(.italic, to: face)
     }
 
     private static func adding(_ extra: NSFontDescriptor.SymbolicTraits, to font: NSFont) -> NSFont {

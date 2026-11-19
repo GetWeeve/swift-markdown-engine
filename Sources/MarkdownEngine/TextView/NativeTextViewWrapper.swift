@@ -437,8 +437,12 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         // makeNSView used to write it — an embedder settings change was inert
         // until the editor was rebuilt. Plain assignment: a tiny value struct,
         // and no rebuild is needed for it to take effect.
+        let fontChanged = (context.coordinator.fontName != fontName) || (context.coordinator.fontSize != fontSize)
         let spacingChanged = context.coordinator.configuration.lists.itemSpacing != configuration.lists.itemSpacing
             || context.coordinator.configuration.lists.adjacentParagraphSpacing != configuration.lists.adjacentParagraphSpacing
+        let typographyChanged = context.coordinator.configuration.paragraph != configuration.paragraph
+        textView.configuration.paragraph = configuration.paragraph
+        context.coordinator.configuration.paragraph = configuration.paragraph
         textView.configuration.lists = configuration.lists
         context.coordinator.configuration.lists = configuration.lists
         // Sync registered extensions (inline spans + fenced blocks). A change alters the GRAMMAR
@@ -452,7 +456,8 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
             textView.configuration.extensions = configuration.extensions
             context.coordinator.cachedParsedDocument = nil
         }
-        if extensionsChanged || spacingChanged {
+        // A font or document switch already styles the complete incoming storage.
+        if !fontChanged, !isNodeSwitch, extensionsChanged || spacingChanged || typographyChanged {
             let fullRange = NSRange(location: 0, length: (textView.string as NSString).length)
             if fullRange.length > 0 {
                 context.coordinator.restyleParagraphs([fullRange], in: textView)
@@ -500,7 +505,6 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
         // Keep the display-time link ink in sync with the theme handed in on
         // this pass (mirrors the insertionPointColor refresh above).
         textView.linkTextAttributes = configuration.theme.linkTextAttributes
-        let fontChanged = (context.coordinator.fontName != fontName) || (context.coordinator.fontSize != fontSize)
         if let pendingInlineReplacement {
             if pendingInlineReplacement.documentId == documentId,
                context.coordinator.lastAppliedInlineReplacementID != pendingInlineReplacement.id {
@@ -513,7 +517,7 @@ public struct NativeTextViewWrapper: NSViewRepresentable {
             }
             return
         }
-        if context.coordinator.didInitialFormatting
+        if !isNodeSwitch && context.coordinator.didInitialFormatting
             && context.coordinator.lastSyncedText == text
             && !fontChanged {
             return

@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+- Editors can center heading, prose and list line boxes across block boundaries and select a custom body strong-emphasis face.
 - `ListStyle.itemSpacing` and `adjacentParagraphSpacing` independently control space between list items and at list/prose boundaries.
 - `MarkdownExtension.plainText(source:childrenText:)`: the plain-text
   counterpart of `html(childrenHTML:)`, applied to the `.string` and

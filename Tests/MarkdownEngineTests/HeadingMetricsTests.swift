@@ -63,6 +63,25 @@ struct HeadingMetricsTests {
         #expect(h5?.minimumLineHeight == 40)
     }
 
+    @Test("heading centering splits the extra height, leaves tight lines alone and preserves the default")
+    func centeredHeadingMetrics() throws {
+        let source = "## Title"
+        let face = try #require(NSFont(name: "Georgia", size: 24))
+        for (height, centered) in [(CGFloat(40), true), (18, true), (40, false)] {
+            let style = HeadingStyle(fontName: face.fontName, fontMultipliers: [1.5], lineHeights: [height])
+            let attrs = MarkdownASTStyler.styleAttributes(text: source, fontName: fontName, fontSize: base,
+                                                         configuration: MarkdownEditorConfiguration(
+                                                             headings: style, paragraph: ParagraphStyle(centersBlockLineHeights: centered)))
+            let values = attrs.filter { NSLocationInRange(3, $0.0) }.map(\.1)
+            let offset = values.compactMap { $0[.baselineOffset] as? CGFloat }.last ?? 0
+            let paragraph = try #require(values.compactMap { $0[.paragraphStyle] as? NSParagraphStyle }.last)
+            let expected = centered ? max(0, ceil((height - face.ascender + face.descender) / 2)) : 0
+            #expect(offset == expected)
+            #expect(paragraph.lineSpacing == offset)
+            #expect(paragraph.minimumLineHeight == height && paragraph.maximumLineHeight == height)
+        }
+    }
+
     @Test("paragraphSpacing overrides the below-heading gap; nil keeps base")
     func paragraphSpacingOverridesBelowHeadingGap() {
         // Default: base paragraph spacing = ceil(baseLineHeight × 0.3).

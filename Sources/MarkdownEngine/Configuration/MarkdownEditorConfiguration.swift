@@ -822,12 +822,19 @@ public struct LinkStyle: Sendable {
 // MARK: - Paragraphs
 
 /// Default paragraph spacing and line height applied to body text.
-public struct ParagraphStyle: Sendable {
+public struct ParagraphStyle: Sendable, Equatable {
     /// Extra paragraph spacing as a fraction of the document's default line height.
     public var spacingFactor: CGFloat
     /// Extra height (points) added to the default paragraph line height.
     public var lineHeightExtraSpacing: CGFloat
 
+    /// Center fixed-height headings, ordinary paragraphs and list items in their
+    /// line boxes. The configured inter-paragraph gaps also apply at block
+    /// boundaries. Blank source lines retain their normal editable height.
+    public var centersBlockLineHeights: Bool
+    /// An optional PostScript face for strong emphasis in body text. A missing
+    /// face uses the normal bold trait. Italic combines with either face.
+    public var strongEmphasisFontName: String?
     /// Split additional line height evenly above and below ordinary text and list items.
     /// When disabled, TextKit retains its default baseline.
     public var centersExtraLineHeight: Bool
@@ -835,7 +842,10 @@ public struct ParagraphStyle: Sendable {
     public var usesFontSmoothing: Bool
 
     public init(spacingFactor: CGFloat = 0.3, lineHeightExtraSpacing: CGFloat = 2,
-                centersExtraLineHeight: Bool = false, usesFontSmoothing: Bool = true) {
+                centersExtraLineHeight: Bool = false, usesFontSmoothing: Bool = true,
+                strongEmphasisFontName: String? = nil, centersBlockLineHeights: Bool = false) {
+        self.centersBlockLineHeights = centersBlockLineHeights
+        self.strongEmphasisFontName = strongEmphasisFontName
         self.usesFontSmoothing = usesFontSmoothing
         self.centersExtraLineHeight = centersExtraLineHeight
         self.spacingFactor = spacingFactor
@@ -843,7 +853,16 @@ public struct ParagraphStyle: Sendable {
     }
 
     func trailingLineSpacing(for extraHeight: CGFloat) -> CGFloat {
-        centersExtraLineHeight ? max(0, floor(extraHeight / 2)) : 0
+        (centersBlockLineHeights || centersExtraLineHeight) ? max(0, floor(extraHeight / 2)) : 0
+    }
+
+    /// TextKit inserts lineSpacing above the first line of a noninitial paragraph.
+    /// Move it below the paragraph so wrapped lines keep their advance and a
+    /// following block starts after a complete line box.
+    func balanceBlockLeading(in style: NSMutableParagraphStyle) {
+        guard centersBlockLineHeights else { return }
+        style.paragraphSpacingBefore -= style.lineSpacing
+        style.paragraphSpacing += style.lineSpacing
     }
 
     public static let `default` = ParagraphStyle()
